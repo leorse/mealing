@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; color: #333; margin: 20px; }
+        h1 { color: #2ECC71; font-size: 20px; }
+        h2 { color: #2C3E50; font-size: 13px; margin-top: 16px; border-bottom: 1px solid #ddd; }
+        .item { padding: 4px 0; display: flex; align-items: center; }
+        .checkbox { width: 12px; height: 12px; border: 1px solid #333; display: inline-block; margin-right: 8px; }
+        .checked { background: #2ECC71; }
+        .qty { color: #666; font-size: 11px; margin-left: 8px; }
+        .footer { margin-top: 30px; font-size: 10px; color: #999; text-align: center; }
+    </style>
+</head>
+<body>
+    <h1>Liste de courses</h1>
+    <p th:text="${list.name}"></p>
+
+    <div th:each="category : ${T(java.util.stream.StreamSupport).stream(list.items.spliterator(), false).map(i -> i.category != null ? i.category : 'Autres').distinct().sorted().collect(T(java.util.stream.Collectors).toList())}">
+        <h2 th:text="${category}"></h2>
+        <div th:each="item : ${list.items}" th:if="${(item.category != null ? item.category : 'Autres') == category}">
+            <div class="item">
+                <span class="checkbox" th:classappend="${item.isChecked ? 'checked' : ''}"></span>
+                <span th:text="${item.label}"></span>
+                <span class="qty" th:if="${item.quantityG != null}">
+                    — <span th:text="${#numbers.formatDecimal(item.quantityG, 1, 0)}"></span> g
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Généré par Mealing le <span th:text="${#temporals.format(#temporals.createNow(), 'dd/MM/yyyy HH:mm')}"></span>
+    </div>
+</body>
+</html>

@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: mealing-postgres
+    environment:
+      POSTGRES_DB: mealing
+      POSTGRES_USER: mealing
+      POSTGRES_PASSWORD: mealing
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mealing"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: mealing-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@mealing.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+  backend:
+    build: ./mealing-backend
+    container_name: mealing-backend
+    environment:
+      DB_USER: mealing
+      DB_PASSWORD: mealing
+      JWT_SECRET: mealingSecretKey_ChangeInProduction_AtLeast256Bits
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mealing
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

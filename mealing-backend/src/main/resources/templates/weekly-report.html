@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; color: #333; margin: 20px; }
+        h1 { color: #2ECC71; font-size: 22px; margin-bottom: 4px; }
+        h2 { color: #2C3E50; font-size: 15px; margin-top: 20px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th { background: #2C3E50; color: white; padding: 6px 8px; text-align: left; font-size: 11px; }
+        td { padding: 5px 8px; border-bottom: 1px solid #eee; }
+        tr:nth-child(even) { background: #f9f9f9; }
+        .summary { background: #ECF0F1; padding: 12px; border-radius: 4px; margin-bottom: 16px; }
+        .summary span { margin-right: 20px; font-weight: bold; }
+        .green { color: #27AE60; } .orange { color: #E67E22; } .red { color: #E74C3C; }
+        .footer { margin-top: 30px; font-size: 10px; color: #999; text-align: center; }
+        .deviation { background: #FDECEA; }
+    </style>
+</head>
+<body>
+    <h1>Mealing — Bilan semaine</h1>
+    <p>Semaine du <strong th:text="${weekStart}"></strong> au <strong th:text="${weekEnd}"></strong></p>
+
+    <div class="summary">
+        <span>Jours trackés : <span th:text="${logs.size()}"></span></span>
+        <span>Calories moy./jour :
+            <span th:text="${#numbers.formatDecimal(logs.stream().mapToDouble(l -> l.totalCalories != null ? l.totalCalories.doubleValue() : 0).average().orElse(0), 1, 0)}"></span> kcal
+        </span>
+    </div>
+
+    <h2>Repas planifiés par jour</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Repas</th>
+                <th>Portions</th>
+                <th>Consommé</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="slot : ${plan.slots}" th:class="${slot.isDeviation ? 'deviation' : ''}">
+                <td th:text="${slot.slotDate}"></td>
+                <td th:text="${slot.mealType}"></td>
+                <td th:text="${slot.recipe != null ? slot.recipe.name : slot.freeLabel}"></td>
+                <td th:text="${slot.portions}"></td>
+                <td th:text="${slot.isConsumed ? '✓' : '-'}"></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>Suivi nutritionnel journalier</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Calories</th>
+                <th>Protéines (g)</th>
+                <th>Glucides (g)</th>
+                <th>Lipides (g)</th>
+                <th>Fibres (g)</th>
+                <th>Poids (kg)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="log : ${logs}">
+                <td th:text="${log.logDate}"></td>
+                <td th:text="${log.totalCalories != null ? #numbers.formatDecimal(log.totalCalories, 1, 0) : '-'}"></td>
+                <td th:text="${log.totalProteins != null ? #numbers.formatDecimal(log.totalProteins, 1, 1) : '-'}"></td>
+                <td th:text="${log.totalCarbs != null ? #numbers.formatDecimal(log.totalCarbs, 1, 1) : '-'}"></td>
+                <td th:text="${log.totalFat != null ? #numbers.formatDecimal(log.totalFat, 1, 1) : '-'}"></td>
+                <td th:text="${log.totalFiber != null ? #numbers.formatDecimal(log.totalFiber, 1, 1) : '-'}"></td>
+                <td th:text="${log.weightKg != null ? log.weightKg : '-'}"></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="footer">
+        Généré par Mealing le <span th:text="${#temporals.format(#temporals.createNow(), 'dd/MM/yyyy HH:mm')}"></span>
+    </div>
+</body>
+</html>
