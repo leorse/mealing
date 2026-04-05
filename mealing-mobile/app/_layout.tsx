@@ -21,7 +21,6 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="recipes" />
           <Stack.Screen name="ingredients" />
           <Stack.Screen name="deviation" options={{ title: 'Déclarer un écart', presentation: 'modal' }} />
         </Stack>

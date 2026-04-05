@@ -239,8 +239,8 @@ function AddSlotModal({ mealType, onClose, onAdd }: {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    recipesApi.getAll().then((r) => setRecipes(r.data)).catch(() => {});
-    preparedMealsApi.getAll().then((r) => setPreparedMeals(r.data)).catch(() => {});
+    recipesApi.getAll().then((r) => setRecipes(Array.isArray(r.data) ? r.data : [])).catch(() => {});
+    preparedMealsApi.getAll().then((r) => setPreparedMeals(Array.isArray(r.data) ? r.data : [])).catch(() => {});
   }, []);
 
   const MEAL_LABEL: Record<MealType, string> = {

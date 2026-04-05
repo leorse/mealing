@@ -1,11 +1,11 @@
 import { useState, useRef } from 'react';
 import { View, ScrollView, StyleSheet, FlatList } from 'react-native';
-import { Text, TextInput, Button, Chip, IconButton, Searchbar, Portal, Modal, Divider } from 'react-native-paper';
+import { Text, TextInput, Button, Chip, IconButton, Searchbar, Portal, Modal, Divider, Snackbar } from 'react-native-paper';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { useRecipeStore } from '../../src/store/useRecipeStore';
-import { useIngredientStore } from '../../src/store/useIngredientStore';
-import { ingredientsApi, Ingredient } from '../../src/api/ingredients';
+import { useRecipeStore } from '../../../src/store/useRecipeStore';
+import { useIngredientStore } from '../../../src/store/useIngredientStore';
+import { ingredientsApi, Ingredient } from '../../../src/api/ingredients';
 
 export default function NewRecipeScreen() {
   const router = useRouter();
@@ -20,6 +20,7 @@ export default function NewRecipeScreen() {
   const [difficulty, setDifficulty] = useState<string>('EASY');
   const [ingredients, setIngredients] = useState<{ ingredientId: string; quantityG: number; name: string }[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Modal ajout ingrédient
   const [showIngModal, setShowIngModal] = useState(false);
@@ -82,8 +83,9 @@ export default function NewRecipeScreen() {
         ingredients: ingredients.map(({ ingredientId, quantityG }) => ({ ingredientId, quantityG })),
       });
       router.back();
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      const msg = e?.response?.data?.error ?? e?.message ?? 'Erreur lors de la sauvegarde';
+      setError(msg);
     } finally {
       setIsSaving(false);
     }
@@ -168,7 +170,7 @@ export default function NewRecipeScreen() {
                 autoFocus
               />
               <FlatList
-                data={ingResults.slice(0, 10)}
+                data={ingResults}
                 keyExtractor={(i) => i.id}
                 style={{ maxHeight: 260, marginTop: 8 }}
                 ListEmptyComponent={
@@ -200,7 +202,7 @@ export default function NewRecipeScreen() {
                   icon="database-plus"
                   onPress={() => {
                     setShowIngModal(false);
-                    router.push('/ingredients/' as any);
+                    router.push('/(tabs)/ingredients/' as any);
                   }}
                   compact
                 >
@@ -211,6 +213,15 @@ export default function NewRecipeScreen() {
           )}
         </Modal>
       </Portal>
+      <Snackbar
+        visible={!!error}
+        onDismiss={() => setError(null)}
+        duration={4000}
+        style={{ backgroundColor: '#E74C3C' }}
+        action={{ label: 'OK', onPress: () => setError(null) }}
+      >
+        {error}
+      </Snackbar>
     </View>
   );
 }

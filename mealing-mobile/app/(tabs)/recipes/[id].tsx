@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Text, Card, Chip, ActivityIndicator, IconButton, Button } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRecipeStore } from '../../src/store/useRecipeStore';
-import { recipesApi, NutritionResponse } from '../../src/api/recipes';
+import { useRecipeStore } from '../../../src/store/useRecipeStore';
+import { recipesApi, NutritionResponse } from '../../../src/api/recipes';
 
 export default function RecipeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { selectedRecipe, fetchRecipe } = useRecipeStore();
+  const { selectedRecipe, fetchRecipe, deleteRecipe } = useRecipeStore();
   const [nutrition, setNutrition] = useState<NutritionResponse | null>(null);
 
   useEffect(() => {
@@ -25,6 +25,19 @@ export default function RecipeDetailScreen() {
       <View style={styles.header}>
         <IconButton icon="arrow-left" onPress={() => router.back()} />
         <Text variant="headlineSmall" style={styles.title} numberOfLines={2}>{selectedRecipe.name}</Text>
+        <IconButton
+          icon="delete-outline"
+          iconColor="#E74C3C"
+          onPress={() =>
+            Alert.alert('Supprimer', `Supprimer "${selectedRecipe.name}" ?`, [
+              { text: 'Annuler', style: 'cancel' },
+              {
+                text: 'Supprimer', style: 'destructive',
+                onPress: async () => { await deleteRecipe(selectedRecipe.id); router.back(); },
+              },
+            ])
+          }
+        />
       </View>
 
       {/* Méta */}
@@ -71,7 +84,7 @@ export default function RecipeDetailScreen() {
         </Card>
       )}
 
-      <Button mode="outlined" icon="pencil" onPress={() => router.push(`/recipes/edit/${id}`)}>
+      <Button mode="outlined" icon="pencil" onPress={() => router.push(`/(tabs)/recipes/edit/${id}`)}>
         Modifier la recette
       </Button>
     </ScrollView>

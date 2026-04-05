@@ -1,7 +1,10 @@
 package com.mealing.nutrition;
 
+import com.mealing.mealplan.MealSlot;
+import com.mealing.mealplan.MealSlotRepository;
 import com.mealing.nutrition.dto.CompensationResponse;
 import com.mealing.nutrition.dto.DeviationRequest;
+import com.mealing.recipe.RecipeIngredient;
 import com.mealing.user.UserProfile;
 import com.mealing.user.UserProfileRepository;
 import com.mealing.user.UserService;
@@ -10,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,16 +27,98 @@ public class NutritionService {
     private final DeviationRepository deviationRepository;
     private final UserProfileRepository userProfileRepository;
     private final UserService userService;
+    private final MealSlotRepository mealSlotRepository;
 
     public DailyLog getDailyLog(LocalDate date, UUID userId) {
-        return dailyLogRepository.findByUserIdAndLogDate(userId, date)
+        DailyLog log = dailyLogRepository.findByUserIdAndLogDate(userId, date)
             .orElseGet(() -> {
-                DailyLog log = new DailyLog();
-                log.setUserId(userId);
-                log.setLogDate(date);
-                return log;
+                DailyLog l = new DailyLog();
+                l.setUserId(userId);
+                l.setLogDate(date);
+                return l;
             });
+
+        // Calcul automatique depuis les slots du planning pour cette date
+        computeFromSlots(log, date, userId);
+        return log;
     }
+
+    private void computeFromSlots(DailyLog log, LocalDate date, UUID userId) {
+        List<MealSlot> slots = mealSlotRepository.findBySlotDateAndWeekPlanUserId(date, userId);
+        if (slots.isEmpty()) return;
+
+        BigDecimal cal = BigDecimal.ZERO, prot = BigDecimal.ZERO,
+                   carbs = BigDecimal.ZERO, fat = BigDecimal.ZERO, fiber = BigDecimal.ZERO;
+
+        for (MealSlot slot : slots) {
+            SlotNutrition sn = computeSlotNutrition(slot);
+            cal   = cal.add(sn.calories);
+            prot  = prot.add(sn.proteins);
+            carbs = carbs.add(sn.carbs);
+            fat   = fat.add(sn.fat);
+            fiber = fiber.add(sn.fiber);
+        }
+
+        log.setTotalCalories(cal.setScale(1, RoundingMode.HALF_UP));
+        log.setTotalProteins(prot.setScale(1, RoundingMode.HALF_UP));
+        log.setTotalCarbs(carbs.setScale(1, RoundingMode.HALF_UP));
+        log.setTotalFat(fat.setScale(1, RoundingMode.HALF_UP));
+        log.setTotalFiber(fiber.setScale(1, RoundingMode.HALF_UP));
+    }
+
+    private record SlotNutrition(BigDecimal calories, BigDecimal proteins,
+                                  BigDecimal carbs, BigDecimal fat, BigDecimal fiber) {}
+
+    private SlotNutrition computeSlotNutrition(MealSlot slot) {
+        // Recette
+        if (slot.getRecipe() != null) {
+            BigDecimal portions = slot.getPortions() != null ? slot.getPortions() : BigDecimal.ONE;
+            int servings = slot.getRecipe().getServings() != null ? slot.getRecipe().getServings() : 1;
+            BigDecimal factor = portions.divide(BigDecimal.valueOf(servings), 6, RoundingMode.HALF_UP);
+
+            BigDecimal cal = BigDecimal.ZERO, prot = BigDecimal.ZERO,
+                       carbs = BigDecimal.ZERO, fat = BigDecimal.ZERO, fiber = BigDecimal.ZERO;
+            for (RecipeIngredient ri : slot.getRecipe().getIngredients()) {
+                if (ri.getIngredient() == null || ri.getQuantityG() == null) continue;
+                BigDecimal q = ri.getQuantityG()
+                    .divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP)
+                    .multiply(factor);
+                cal   = cal.add(orZero(ri.getIngredient().getCalories100g()).multiply(q));
+                prot  = prot.add(orZero(ri.getIngredient().getProteins100g()).multiply(q));
+                carbs = carbs.add(orZero(ri.getIngredient().getCarbs100g()).multiply(q));
+                fat   = fat.add(orZero(ri.getIngredient().getFat100g()).multiply(q));
+                fiber = fiber.add(orZero(ri.getIngredient().getFiber100g()).multiply(q));
+            }
+            return new SlotNutrition(cal, prot, carbs, fat, fiber);
+        }
+
+        // Plat préparé
+        if (slot.getPreparedMeal() != null) {
+            var pm = slot.getPreparedMeal();
+            BigDecimal portions = slot.getPreparedMealPortions() != null
+                ? slot.getPreparedMealPortions() : BigDecimal.ONE;
+            return new SlotNutrition(
+                orZero(pm.getCaloriesPortion()).multiply(portions),
+                orZero(pm.getProteinsG()).multiply(portions),
+                orZero(pm.getCarbsG()).multiply(portions),
+                orZero(pm.getFatG()).multiply(portions),
+                orZero(pm.getFiberG()).multiply(portions)
+            );
+        }
+
+        // Libre / override calories
+        if (slot.getCaloriesOverride() != null) {
+            return new SlotNutrition(
+                BigDecimal.valueOf(slot.getCaloriesOverride()),
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO
+            );
+        }
+
+        return new SlotNutrition(BigDecimal.ZERO, BigDecimal.ZERO,
+                                  BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    private BigDecimal orZero(BigDecimal v) { return v != null ? v : BigDecimal.ZERO; }
 
     @Transactional
     public DailyLog updateDailyLog(LocalDate date, DailyLog update, UUID userId) {
@@ -44,11 +130,6 @@ public class NutritionService {
                 return l;
             });
 
-        if (update.getTotalCalories() != null) log.setTotalCalories(update.getTotalCalories());
-        if (update.getTotalProteins() != null) log.setTotalProteins(update.getTotalProteins());
-        if (update.getTotalCarbs() != null) log.setTotalCarbs(update.getTotalCarbs());
-        if (update.getTotalFat() != null) log.setTotalFat(update.getTotalFat());
-        if (update.getTotalFiber() != null) log.setTotalFiber(update.getTotalFiber());
         if (update.getWeightKg() != null) log.setWeightKg(update.getWeightKg());
         if (update.getNotes() != null) log.setNotes(update.getNotes());
 
@@ -56,7 +137,24 @@ public class NutritionService {
     }
 
     public List<DailyLog> getStats(LocalDate from, LocalDate to, UUID userId) {
-        return dailyLogRepository.findByUserIdAndLogDateBetween(userId, from, to);
+        List<DailyLog> stored = dailyLogRepository.findByUserIdAndLogDateBetween(userId, from, to);
+        // Compléter les jours sans log avec les données du planning
+        List<DailyLog> result = new ArrayList<>();
+        for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
+            LocalDate day = d;
+            DailyLog log = stored.stream()
+                .filter(l -> l.getLogDate().equals(day))
+                .findFirst()
+                .orElseGet(() -> {
+                    DailyLog l = new DailyLog();
+                    l.setUserId(userId);
+                    l.setLogDate(day);
+                    return l;
+                });
+            computeFromSlots(log, day, userId);
+            result.add(log);
+        }
+        return result;
     }
 
     @Transactional

@@ -1,6 +1,6 @@
 # Mealing — Spécifications Techniques & Fonctionnelles
 
-> Version 1.0 — Avril 2026  
+> Version 2.0 — Avril 2026  
 > Application de planification des repas et suivi nutritionnel
 
 ---
@@ -11,25 +11,26 @@
 2. [Périmètre fonctionnel](#2-périmètre-fonctionnel)
 3. [Architecture technique](#3-architecture-technique)
 4. [Backend — Spring Boot](#4-backend--spring-boot)
-5. [Frontend — React Native (Android)](#5-frontend--react-native-android)
+5. [Frontend — React Native (Expo)](#5-frontend--react-native-expo)
 6. [Base de données](#6-base-de-données)
 7. [API REST](#7-api-rest)
 8. [Module nutritionnel](#8-module-nutritionnel)
 9. [Module graphiques & analytics](#9-module-graphiques--analytics)
 10. [Export PDF](#10-export-pdf)
 11. [Sécurité & authentification](#11-sécurité--authentification)
-12. [Roadmap & phases de développement](#12-roadmap--phases-de-développement)
+12. [Outil OFF Catalog](#12-outil-off-catalog)
+13. [Roadmap & état d'avancement](#13-roadmap--état-davancement)
 
 ---
 
 ## 1. Vision du produit
 
-**Mealing** est une application mobile Android permettant à l'utilisateur de :
+**Mealing** est une application mobile locale permettant à l'utilisateur de :
 
 - Planifier ses repas à la semaine
 - Générer automatiquement sa liste de courses
 - Suivre ses apports nutritionnels (calories, macros)
-- Gérer les écarts alimentaires (prévus ou imprévus)
+- Gérer les écarts alimentaires (plats préparés, restaurant, extras)
 - Visualiser ses tendances via des graphiques
 - Exporter ses bilans nutritionnels en PDF
 
@@ -37,12 +38,13 @@
 
 | Critère | Valeur |
 |---|---|
-| Plateforme cible | Android (React Native) |
-| Pas de fonctionnalité de partage | ✅ Hors scope |
-| Export PDF | ✅ In scope |
-| Graphiques (jour / semaine / mois) | ✅ In scope |
+| Plateforme cible | Android — React Native (Expo) |
+| Fonctionnement web | Possible via `npx expo start --web` |
 | Multi-utilisateur | Non — application mono-compte locale |
-| Connexion internet | Requise pour import Open Food Facts ; reste offline-friendly |
+| Open Food Facts | Catalogue SQLite local (`off_catalog.db`) — pas d'API externe |
+| Connexion internet | Non requise (hors connexion JWT initiale) |
+| Export PDF | In scope |
+| Graphiques (jour / semaine / mois) | In scope |
 
 ---
 
@@ -53,41 +55,71 @@
 - Saisie des données personnelles : prénom, âge, sexe, taille, poids
 - Calcul automatique du BMR (Mifflin-St Jeor) et du TDEE selon le niveau d'activité physique
 - Définition de l'objectif : perte / maintien / prise de masse
-- Objectif calorique journalier calculé ou saisi manuellement
+- Objectif calorique journalier calculé automatiquement
 - Répartition macro personnalisable (protéines / glucides / lipides en %)
 
 ### 2.2 Base de données d'ingrédients
 
 - Stockage local d'aliments avec valeurs nutritionnelles pour 100 g :
-  - Calories (kcal)
-  - Protéines (g)
-  - Glucides (g) dont sucres
-  - Lipides (g) dont acides gras saturés
-  - Fibres (g)
-  - Sel (g)
+  - Calories (kcal), Protéines, Glucides dont sucres, Lipides dont saturés, Fibres, Sel
   - Indice glycémique (IG) — quand disponible
   - Nutri-Score (A à E) — quand disponible
-  - Allergènes (liste normalisée UE)
-- Import depuis **Open Food Facts API** (open source, gratuit) par recherche textuelle ou scan de code-barres EAN
-- Possibilité d'ajouter un aliment manuellement
+- Champ `source` sur chaque ingrédient : `CIQUAL` | `OFF` | `MANUAL` (null = manuel)
+
+#### Sources d'ingrédients
+
+| Source | Description | Recherche |
+|---|---|---|
+| `CIQUAL` | Base ANSES (~3 000 aliments génériques FR) | Mode "Générique" dans la recherche |
+| `OFF` | Open Food Facts — produits de marque | Mode "Marque (OFF)" — nécessite `off_catalog.db` |
+| `MANUAL` | Saisi manuellement par l'utilisateur | Inclus dans les deux modes |
+
+#### Recherche d'ingrédients (écran unifié avec toggle)
+
+L'écran de recherche propose deux modes via `SegmentedButtons` :
+- **Générique** : recherche dans `/api/ingredients?q=` (base locale = Ciqual + ingrédients manuels). Les résultats affichent un badge "Disponible" — ils sont déjà dans la base, pas besoin de les importer.
+- **Marque (OFF)** : recherche dans `/api/off-catalog/search?q=` (catalogue SQLite OFF). Les résultats ont un bouton "Ajouter" pour les importer dans la base locale.
+
+#### Base Ciqual
+
+- Import depuis les paramètres de l'application (connexion internet requise)
+- Télécharge le CSV officiel ANSES (~2 Mo) et insère dans la table `ingredients` avec `source = 'CIQUAL'`
+- Import asynchrone (arrière-plan), statut visible dans les paramètres
+- Ré-importable pour mise à jour (upsert par `off_id = CIQUAL_<code>`)
+- Statut dans les paramètres : nombre d'aliments importés + résultat du dernier import
+
+#### Catalogue Open Food Facts local (`off_catalog.db`)
+
+- Fichier SQLite généré par `tools/off-import/` depuis le dump JSONL OFF
+- Si absent : mode "Marque" désactivé, seule la base locale est utilisable
+- Si présent : recherche textuelle sur nom, nom_fr, marque (LIMIT 30)
+- Statut affiché dans les paramètres (présent/absent + nombre de produits)
+
+#### Autres actions
+- Import par code-barres EAN depuis le catalogue local
+- Création manuelle d'un ingrédient
 - Catégories : Légumes, Fruits, Viandes & poissons, Produits laitiers, Féculents, Matières grasses, Boissons, Épicerie, Autres
 
 ### 2.3 Gestion des recettes
 
-- Création de recettes : nom, photo optionnelle, nb de portions, temps de préparation
-- Ajout d'ingrédients avec quantité en grammes ou unités (ex : 1 œuf = 60 g)
+- CRUD recettes : nom, description, nb de portions, temps de préparation/cuisson, difficulté
+- Ajout d'ingrédients avec quantité en grammes ou unités
 - Calcul automatique des valeurs nutritionnelles totales et par portion
-- Tag de difficulté : facile / moyen / élaboré
-- Tag healthy automatique si la recette respecte des critères configurables (ex : < 500 kcal/portion, Nutri-Score ≥ B)
+- Tags (JSONB) et champ `nutritionOverride` pour forcer les macros
+- **Import JSON** : endpoint `POST /api/recipes/import` acceptant un JSON structuré
+  - Résolution en cascade : correspondance exacte → fuzzy LIKE → barcode catalogue → barcode OFF
+  - Retourne `status` (SUCCESS / PARTIAL_SUCCESS / FAILED), `resolvedCount`, liste des ingrédients non résolus
+  - Frontend : écran de résolution manuelle pour les ingrédients non trouvés
 - Historique des recettes utilisées
 
 ### 2.4 Planning hebdomadaire
 
 - Vue calendrier de la semaine en cours (lundi → dimanche)
 - 4 créneaux par jour : Petit-déjeuner, Déjeuner, Dîner, Collation
-- Ajout d'un repas : sélection d'une recette existante ou saisie libre
+- Ajout d'un repas : recette / plat préparé / repas restaurant / saisie libre
+- `source_type` par créneau : `RECIPE` / `PREPARED_MEAL` / `RESTAURANT` / `FREE`
 - Affichage du total calorique du jour en temps réel
-- Indicateur visuel par jour : vert (dans l'objectif ±10%), orange (léger écart), rouge (dépassement)
+- Indicateur visuel : vert (±10%), orange (léger écart), rouge (dépassement)
 - Navigation entre les semaines (historique + planification future)
 - Copier/coller une semaine vers une autre semaine
 
@@ -95,33 +127,48 @@
 
 - Génération automatique depuis le planning de la semaine sélectionnée
 - Regroupement des ingrédients par catégorie (rayon)
-- Dédoublonnage et agrégation des quantités (ex : tomates : 400 g + 200 g = 600 g)
+- Dédoublonnage et agrégation des quantités
 - Ajout manuel d'articles hors recette
-- Cochage au fur et à mesure (interface liste de courses interactive)
-- Gestion d'un "inventaire frigo" pour déduire ce qui est déjà disponible (optionnel)
+- Cochage au fur et à mesure
 - Export de la liste en texte ou PDF
 
 ### 2.6 Suivi nutritionnel & gestion des écarts
 
-#### Écart prévu
-- Marquage d'un repas comme "écart prévu" (restaurant, fête…)
-- Estimation manuelle des calories de l'écart
-- Le système répartit la compensation sur les autres repas de la semaine (réduction proportionnelle des objectifs journaliers)
-- Notification/suggestion : "Pour compenser, vise 1 650 kcal demain et après-demain"
-
-#### Écart imprévu (saisie a posteriori)
-- Saisie d'un repas non planifié après consommation
-- Choix rapide parmi des repas types (pizza, burger, kebab, dessert riche…) avec kcal estimées
-- Ou saisie libre en kcal
-- Calcul du surplus sur la journée
-- Affichage de la dette calorique et suggestions de compensation sur J+1 / J+2
-- Historique des écarts avec type et surplus
-
-### 2.7 Journalisation alimentaire
-
-- Validation quotidienne des repas (repas planifié → consommé ou modifié)
+- Validation quotidienne des repas (consommé ou modifié)
 - Différence planning vs. réel tracée
-- Saisie du poids du jour (optionnel) pour suivre l'évolution
+- Saisie du poids du jour (optionnel)
+
+#### Écart prévu / imprévu
+- Marquage d'un créneau comme écart avec estimation manuelle des calories
+- Calcul du surplus et suggestions de compensation sur J+1 / J+2
+- Historique des écarts
+
+### 2.7 Plats préparés (Prepared Meals)
+
+- Création d'un plat préparé : nom, marque, calories/portion, macros, nb de portions
+- Import depuis le catalogue OFF par code-barres EAN
+- Favoris (flag `is_favorite`)
+- Association à un créneau du planning (`source_type = PREPARED_MEAL`, nb de portions consommées)
+- 8 endpoints CRUD + `POST /from-barcode/{ean}` + `PUT /{id}/favorite`
+
+### 2.8 Extras de repas (Meal Extras)
+
+- Ajout d'extras à un créneau existant (boisson, dessert, sauce…)
+- 3 modes :
+  - `INGREDIENT` : lié à un ingrédient de la base locale
+  - `PREPARED` : lié à un plat préparé
+  - `FREE` : saisie libre en kcal
+- Calcul du total nutritionnel créneau + extras via `GET /api/meal-slots/{slotId}/nutrition-total`
+
+### 2.9 Repas restaurant (Restaurant Meals)
+
+- Base de gabarits de plats (`dish_templates`) : ~70 plats typiques (français, italien, japonais, chinois, etc.) avec calories estimées
+- 3 méthodes de saisie d'un repas restaurant :
+  - `FREE` : saisie directe en kcal
+  - `GUIDED` : sélection de gabarits depuis la liste (recherche par nom/catégorie)
+  - `RECONSTRUCTED` : reconstruction ingrédient par ingrédient
+- Recherche de gabarits : `GET /api/dish-templates?q=&category=`
+- Calcul du total nutritionnel du repas
 
 ---
 
@@ -130,51 +177,61 @@
 ```
 mealing/
 ├── mealing-backend/          # Spring Boot API
-│   ├── src/main/java/
-│   │   └── com/mealing/
-│   │       ├── auth/         # JWT, sécurité
-│   │       ├── user/         # Profil, objectifs
-│   │       ├── ingredient/   # BDD aliments + import OFF
-│   │       ├── recipe/       # Recettes
-│   │       ├── mealplan/     # Planning semaine
-│   │       ├── shoppinglist/ # Liste de courses
-│   │       ├── nutrition/    # Calculs, historique
-│   │       ├── export/       # Génération PDF
-│   │       └── config/       # CORS, security, OpenAPI
+│   ├── src/main/java/com/mealing/
+│   │   ├── auth/             # JWT, sécurité
+│   │   ├── user/             # Profil, objectifs
+│   │   ├── ingredient/       # BDD aliments + import OFF catalogue
+│   │   ├── recipe/           # Recettes + import JSON
+│   │   ├── mealplan/         # Planning semaine
+│   │   ├── preparedmeal/     # Plats préparés
+│   │   ├── mealextra/        # Extras de repas
+│   │   ├── restaurant/       # Gabarits + repas restaurant
+│   │   ├── offcatalog/       # Lecture du catalogue SQLite OFF
+│   ├── ciqual/           # Import base ANSES Ciqual (CSV)
+│   │   ├── shoppinglist/     # Liste de courses
+│   │   ├── nutrition/        # Calculs, historique
+│   │   ├── export/           # Génération PDF
+│   │   └── config/           # CORS, security, OpenAPI, GlobalExceptionHandler
 │   └── src/main/resources/
 │       ├── application.yml
-│       └── data/             # Seeds initiales (aliments courants)
+│       └── db/migration/     # V1 à V8 Flyway
 │
-├── mealing-mobile/           # React Native (Android)
-│   ├── src/
-│   │   ├── api/              # Appels REST (Axios)
-│   │   ├── screens/          # Écrans principaux
-│   │   ├── components/       # Composants réutilisables
-│   │   ├── navigation/       # React Navigation
-│   │   ├── store/            # Zustand (state management)
-│   │   ├── hooks/            # Custom hooks
-│   │   └── utils/            # Helpers, formatters
-│   └── android/
+├── mealing-mobile/           # React Native (Expo)
+│   ├── app/                  # Expo Router (file-based routing)
+│   │   ├── (tabs)/           # Onglets principaux
+│   │   ├── auth/
+│   │   ├── ingredients/
+│   │   ├── recipes/
+│   │   ├── meal-slots/
+│   │   ├── prepared-meals/
+│   │   └── restaurant-meals/
+│   └── src/
+│       ├── api/              # Clients Axios
+│       └── store/            # Zustand stores
 │
-└── docker-compose.yml        # PostgreSQL + backend + pgAdmin
+├── tools/
+│   └── off-import/           # Outil Java standalone (fat JAR)
+│       ├── pom.xml
+│       └── src/main/java/OffImporter.java
+│
+└── off_catalog.db            # Catalogue OFF SQLite (généré manuellement)
 ```
 
 ### Décisions d'architecture
 
 | Composant | Choix | Justification |
 |---|---|---|
-| Backend | Spring Boot 3.x | Robuste, ecosystème riche, JPA natif |
-| BDD | PostgreSQL 15 | Requêtes analytiques, JSON natif, open source |
-| ORM | Spring Data JPA / Hibernate | Standard Spring, migrations Flyway |
-| Auth | JWT (Bearer token) | Stateless, mobile-friendly |
-| API doc | SpringDoc OpenAPI 3 (Swagger UI) | Documentation auto-générée |
-| Mobile | React Native 0.73+ | Android ciblé, JS/TS, accès caméra natif |
-| State | Zustand | Léger, simple, pas de boilerplate Redux |
-| HTTP client | Axios | Intercepteurs JWT, gestion d'erreurs centralisée |
-| Graphiques | Victory Native ou Recharts | Composants charts React Native |
-| PDF mobile | react-native-print ou expo-print | Rendu HTML → PDF natif Android |
-| Scan CB | react-native-vision-camera + MLKit | Scan EAN rapide offline |
-| Navigation | React Navigation v6 | Standard de facto React Native |
+| Backend | Spring Boot 3.2.4 / Java 21 | Robuste, ecosystème riche, JPA natif |
+| BDD principale | PostgreSQL 15 (Flyway) | Requêtes analytiques, JSON natif |
+| BDD catalogue OFF | SQLite (`off_catalog.db`) | Local, lecture seule, ~60M produits |
+| ORM | Spring Data JPA / Hibernate | Standard Spring |
+| Auth | JWT (Bearer token, HS256) | Stateless, mobile-friendly |
+| API doc | SpringDoc OpenAPI 3 (Swagger) | Documentation auto-générée |
+| Mobile | React Native 0.73 + Expo SDK 51 | Android ciblé, accès caméra |
+| Routing mobile | Expo Router (file-based) | Standard Expo, similaire Next.js |
+| State | Zustand | Léger, simple |
+| HTTP client | Axios | Intercepteurs JWT |
+| Erreurs OFF | GlobalExceptionHandler → `{ error, status, timestamp }` | Propagation propre vers le frontend |
 
 ---
 
@@ -184,57 +241,58 @@ mealing/
 
 ```xml
 <!-- Spring -->
-<dependency>spring-boot-starter-web</dependency>
-<dependency>spring-boot-starter-data-jpa</dependency>
-<dependency>spring-boot-starter-security</dependency>
-<dependency>spring-boot-starter-validation</dependency>
+spring-boot-starter-web
+spring-boot-starter-data-jpa
+spring-boot-starter-security
+spring-boot-starter-validation
+spring-boot-starter-webflux      <!-- WebClient (plus utilisé activement) -->
+spring-boot-starter-thymeleaf    <!-- templates PDF -->
 
 <!-- Base de données -->
-<dependency>postgresql</dependency>
-<dependency>flyway-core</dependency>
+postgresql
+flyway-core
+sqlite-jdbc (3.45.3.0)           <!-- lecture off_catalog.db -->
+<!-- Pas de dépendance supplémentaire pour Ciqual : CSV parsé avec java.net.http + BufferedReader -->
 
 <!-- Auth -->
-<dependency>jjwt-api</dependency>
-<dependency>jjwt-impl</dependency>
+jjwt-api / jjwt-impl / jjwt-jackson (0.12.5)
 
 <!-- PDF -->
-<dependency>openhtmltopdf-pdfbox</dependency>
-<dependency>thymeleaf</dependency>  <!-- templates HTML → PDF -->
-
-<!-- HTTP client (Open Food Facts) -->
-<dependency>spring-boot-starter-webflux</dependency>  <!-- WebClient -->
+openhtmltopdf-pdfbox (1.0.10)
 
 <!-- Outils -->
-<dependency>lombok</dependency>
-<dependency>mapstruct</dependency>
-<dependency>springdoc-openapi-starter-webmvc-ui</dependency>
+lombok (1.18.34)
+springdoc-openapi-starter-webmvc-ui (2.3.0)
 ```
 
-### 4.2 Configuration application.yml
+### 4.2 Configuration `application.yml`
 
 ```yaml
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/mealing
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mealing}
     username: ${DB_USER:mealing}
     password: ${DB_PASSWORD:mealing}
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     show-sql: false
   flyway:
     enabled: true
     locations: classpath:db/migration
+    baseline-on-migrate: true
 
 mealing:
   jwt:
-    secret: ${JWT_SECRET}
-    expiration: 86400000  # 24h
+    secret: ${JWT_SECRET:mealingSecretKey_ChangeInProduction_AtLeast256BitsLong!!}
+    expiration: 86400000
   nutrition:
-    default-tdee-multiplier: 1.55  # activité modérée
+    default-tdee-multiplier: 1.55
   open-food-facts:
     base-url: https://world.openfoodfacts.org/api/v2
     timeout: 5000
+  off-catalog:
+    path: ${OFF_CATALOG_PATH:off_catalog.db}   # chemin relatif à user.dir ou absolu
 
 server:
   port: 8080
@@ -247,352 +305,454 @@ com.mealing/
 ├── auth/
 │   ├── AuthController.java
 │   ├── AuthService.java
-│   ├── JwtService.java
-│   └── dto/ (LoginRequest, RegisterRequest, AuthResponse)
+│   └── JwtService.java
 │
 ├── user/
-│   ├── UserController.java
+│   ├── UserController.java (profil)
 │   ├── UserService.java
-│   ├── UserEntity.java
-│   ├── UserProfile.java         # objectifs, données physiques
-│   └── dto/
+│   └── UserEntity.java / UserProfile.java
 │
 ├── ingredient/
 │   ├── IngredientController.java
 │   ├── IngredientService.java
 │   ├── IngredientEntity.java
-│   ├── OpenFoodFactsClient.java  # WebClient
-│   └── dto/
+│   ├── IngredientRepository.java
+│   └── OpenFoodFactsClient.java   # WebClient (backup barcode)
 │
 ├── recipe/
 │   ├── RecipeController.java
 │   ├── RecipeService.java
-│   ├── RecipeEntity.java
-│   ├── RecipeIngredient.java     # table pivot avec quantité
+│   ├── RecipeEntity.java          # + tags (jsonb), nutritionOverride
+│   ├── RecipeIngredient.java      # + isResolved
+│   ├── RecipeRepository.java
+│   ├── RecipeIngredientRepository.java
+│   ├── RecipeImportService.java   # résolution cascade
 │   └── dto/
+│       ├── RecipeImportRequest.java
+│       └── RecipeImportResponse.java
 │
 ├── mealplan/
 │   ├── MealPlanController.java
-│   ├── MealPlanService.java
-│   ├── WeekPlan.java             # agrège les MealSlot
-│   ├── MealSlot.java             # créneau jour + type repas
-│   └── dto/
+│   ├── MealPlanService.java       # + getSlotById(), getSlotNutrition()
+│   ├── WeekPlan.java
+│   └── MealSlot.java              # + preparedMeal, preparedMealPortions, sourceType
+│
+├── preparedmeal/
+│   ├── PreparedMealController.java   # 8 endpoints
+│   ├── PreparedMealService.java
+│   ├── PreparedMeal.java
+│   └── PreparedMealRepository.java
+│
+├── mealextra/
+│   ├── MealExtraController.java   # + GET /nutrition-total
+│   ├── MealExtraService.java
+│   ├── MealExtra.java             # extraType: INGREDIENT / PREPARED / FREE
+│   └── MealExtraRepository.java
+│
+├── restaurant/
+│   ├── RestaurantMealController.java
+│   ├── RestaurantMealService.java  # computeTotal() FREE/GUIDED/RECONSTRUCTED
+│   ├── DishTemplate.java           # ~70 gabarits seedés en V7
+│   ├── RestaurantMeal.java
+│   └── RestaurantMealIngredient.java
+│
+├── offcatalog/
+│   ├── OffCatalogController.java   # GET /status, GET /search?q=
+│   └── OffCatalogService.java      # @PostConstruct init, search()
+│
+├── ciqual/
+│   ├── CiqualController.java       # GET /status, POST /import
+│   └── CiqualService.java          # téléchargement CSV ANSES, parsing, upsert batch
 │
 ├── shoppinglist/
 │   ├── ShoppingListController.java
-│   ├── ShoppingListService.java
-│   ├── ShoppingItem.java
-│   └── dto/
+│   └── ShoppingListService.java
 │
 ├── nutrition/
-│   ├── NutritionController.java
-│   ├── NutritionService.java
-│   ├── DailyLog.java             # log journalier réel
-│   ├── Deviation.java            # écarts alimentaires
-│   └── dto/
+│   └── NutritionController.java / NutritionService.java
 │
-└── export/
-    ├── ExportController.java
-    ├── PdfExportService.java
-    └── templates/               # Thymeleaf HTML templates
+├── export/
+│   └── PdfExportService.java
+│
+└── config/
+    ├── SecurityConfig.java
+    ├── CorsConfig.java
+    └── GlobalExceptionHandler.java  # @RestControllerAdvice → { error, status, timestamp }
 ```
+
+### 4.4 Migrations Flyway
+
+| Version | Contenu |
+|---|---|
+| V1 | Tables de base : users, user_profiles, ingredients, recipes, recipe_ingredients, week_plans, meal_slots, shopping_lists, shopping_items, daily_logs, deviations |
+| V2 | Seeds ingrédients courants |
+| V3 | ... |
+| V4 | ... |
+| V5 | `prepared_meals` + alter `meal_slots` (prepared_meal_id, prepared_meal_portions, source_type) |
+| V6 | `meal_extras` (id, meal_slot_id, extra_type, ingredient_id, prepared_meal_id, calories_free, label, quantity_g) |
+| V7 | `dish_templates` + `restaurant_meals` + `restaurant_meal_ingredients` + ~70 seeds de plats |
+| V8 | Alter `recipes` : add `tags`, `nutrition_override` ; alter `recipe_ingredients` : add `is_resolved` |
+| V9 | Alter `ingredients` : add `source VARCHAR(20)` ; backfill `CIQUAL` pour les seeds, `OFF` pour les imports OFF |
 
 ---
 
-## 5. Frontend — React Native (Android)
+## 5. Frontend — React Native (Expo)
 
-### 5.1 Structure des écrans
+### 5.1 Structure des écrans (Expo Router)
 
 ```
-screens/
+app/
 ├── auth/
-│   ├── LoginScreen.tsx
-│   └── RegisterScreen.tsx
+│   ├── login.tsx
+│   └── register.tsx
 │
-├── onboarding/
-│   └── ProfileSetupScreen.tsx   # données physiques + objectifs
-│
-├── home/
-│   └── HomeScreen.tsx           # résumé jour + accès rapides
-│
-├── planning/
-│   ├── WeekPlanScreen.tsx        # vue calendrier semaine
-│   ├── DayDetailScreen.tsx       # détail d'un jour
-│   └── AddMealScreen.tsx         # ajout d'un repas à un créneau
-│
-├── recipes/
-│   ├── RecipeListScreen.tsx
-│   ├── RecipeDetailScreen.tsx
-│   └── RecipeFormScreen.tsx      # création / édition
+├── (tabs)/                        # Bottom Tab Navigator
+│   ├── _layout.tsx                # 5 onglets
+│   ├── index.tsx                  # Accueil / Planning semaine
+│   ├── suivi.tsx                  # Suivi nutritionnel
+│   ├── courses.tsx                # Liste de courses
+│   ├── ingredients.tsx            # Gestion ingrédients (FAB: OFF search / manuel)
+│   ├── prepared.tsx               # → redirect prepared-meals/
+│   └── settings.tsx               # Paramètres + statut catalogue OFF
 │
 ├── ingredients/
-│   ├── IngredientSearchScreen.tsx
-│   ├── IngredientDetailScreen.tsx
-│   └── BarcodeScanScreen.tsx
+│   ├── off-search.tsx             # Recherche dans le catalogue OFF local
+│   ├── new.tsx                    # Créer ingrédient manuellement
+│   └── [id].tsx                   # Détail / édition ingrédient
 │
-├── shopping/
-│   └── ShoppingListScreen.tsx
+├── recipes/
+│   ├── index.tsx                  # Liste recettes
+│   ├── new.tsx                    # Créer recette
+│   ├── [id].tsx                   # Détail recette
+│   ├── [id]/edit.tsx              # Éditer recette
+│   └── import.tsx                 # Import JSON + résolution ingrédients
 │
-├── nutrition/
-│   ├── DashboardScreen.tsx       # graphiques principaux
-│   ├── DailyLogScreen.tsx        # saisie journalière
-│   └── DeviationScreen.tsx       # gestion des écarts
+├── meal-slots/
+│   ├── _layout.tsx
+│   └── [id].tsx                   # Détail créneau + extras + AddExtraModal
 │
-├── analytics/
-│   └── AnalyticsScreen.tsx       # graphiques jour/semaine/mois
+├── prepared-meals/
+│   ├── _layout.tsx
+│   ├── index.tsx                  # Liste plats préparés
+│   ├── new.tsx                    # Créer plat préparé
+│   └── [id].tsx                   # Détail / édition
 │
-├── export/
-│   └── ExportScreen.tsx
-│
-└── settings/
-    └── SettingsScreen.tsx
+└── restaurant-meals/
+    ├── _layout.tsx
+    ├── new.tsx                    # 4 étapes : info → méthode → détails → résumé
+    └── [id].tsx                   # Détail repas restaurant
 ```
 
-### 5.2 Navigation (React Navigation v6)
+### 5.2 Navigation — Onglets principaux
 
 ```
-RootNavigator
-├── AuthStack (non authentifié)
-│   ├── LoginScreen
-│   ├── RegisterScreen
-│   └── ProfileSetupScreen
-│
-└── MainTabs (authentifié — Bottom Tab Navigator)
-    ├── Tab: Accueil         → HomeScreen
-    ├── Tab: Planning        → WeekPlanScreen (Stack)
-    ├── Tab: Courses         → ShoppingListScreen
-    ├── Tab: Suivi           → DashboardScreen (Stack)
-    └── Tab: Paramètres      → SettingsScreen
+MainTabs (Bottom Tab Navigator)
+├── Accueil      (🏠)  → Planning semaine
+├── Suivi        (📊)  → Dashboard nutritionnel
+├── Courses      (🛒)  → Liste de courses
+├── Ingrédients  (🥦)  → Gestion base ingrédients
+├── Plats        (📦)  → Plats préparés
+└── Paramètres   (⚙️)  → Profil + statut catalogue OFF
 ```
 
 ### 5.3 State management (Zustand)
 
 ```typescript
-// stores/useUserStore.ts
-interface UserStore {
-  user: User | null;
-  profile: UserProfile | null;
+// store/useAuthStore.ts
+interface AuthStore {
   token: string | null;
-  setUser: (user: User, token: string) => void;
+  email: string | null;
+  login: (email, password) => Promise<void>;
   logout: () => void;
 }
 
-// stores/usePlanStore.ts
-interface PlanStore {
-  currentWeek: WeekPlan | null;
-  selectedDate: Date;
-  fetchWeek: (weekStart: string) => Promise<void>;
-  addMeal: (slot: MealSlot) => Promise<void>;
-}
-
-// stores/useNutritionStore.ts
-interface NutritionStore {
-  dailyLogs: Record<string, DailyLog>;
-  todayStats: NutritionStats | null;
-  fetchDailyLog: (date: string) => Promise<void>;
-  addDeviation: (deviation: Deviation) => Promise<void>;
+// store/useIngredientStore.ts
+interface IngredientStore {
+  ingredients: Ingredient[];
+  lastAdded: Ingredient | null;      // useFocusEffect auto-select pattern
+  fetchAll: () => Promise<void>;
+  addToLocal: (ing: Ingredient) => Promise<void>;
 }
 ```
 
-### 5.4 Bibliothèques React Native
+### 5.4 Clients API (`src/api/`)
 
-```json
-{
-  "dependencies": {
-    "@react-navigation/native": "^6.x",
-    "@react-navigation/bottom-tabs": "^6.x",
-    "@react-navigation/stack": "^6.x",
-    "axios": "^1.x",
-    "zustand": "^4.x",
-    "react-native-vision-camera": "^3.x",
-    "vision-camera-code-scanner": "^x",
-    "victory-native": "^36.x",
-    "react-native-svg": "^14.x",
-    "react-native-print": "^0.x",
-    "@react-native-async-storage/async-storage": "^1.x",
-    "react-native-paper": "^5.x",
-    "react-native-calendars": "^1.x",
-    "date-fns": "^3.x",
-    "react-native-reanimated": "^3.x",
-    "react-native-gesture-handler": "^2.x"
-  }
-}
-```
+| Fichier | Description |
+|---|---|
+| `client.ts` | Axios instance avec intercepteur JWT |
+| `ingredients.ts` | CRUD ingrédients + `recipeImportApi` |
+| `offCatalog.ts` | `status()`, `search(q)` → catalogue SQLite |
+| `profile.ts` | Profil utilisateur + objectifs |
+| `recipes.ts` | CRUD recettes |
+| `mealPlan.ts` | Planning semaine |
+| `preparedMeals.ts` | CRUD plats préparés |
+| `mealExtras.ts` | Extras de créneaux |
+| `restaurantMeals.ts` | Repas restaurant + gabarits |
+| `shopping.ts` | Liste de courses |
+| `nutrition.ts` | Logs journaliers, écarts |
 
 ---
 
 ## 6. Base de données
 
-### 6.1 Schéma relationnel
+### 6.1 PostgreSQL — Schéma principal
 
 ```sql
 -- Utilisateur
 CREATE TABLE users (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email       VARCHAR(255) UNIQUE NOT NULL,
-    password    VARCHAR(255) NOT NULL,          -- bcrypt
-    created_at  TIMESTAMP DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,  -- bcrypt
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Profil physique & objectifs
 CREATE TABLE user_profiles (
-    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id             UUID REFERENCES users(id) ON DELETE CASCADE,
-    first_name          VARCHAR(100),
-    birth_date          DATE,
-    gender              VARCHAR(10),              -- MALE / FEMALE / OTHER
-    height_cm           DECIMAL(5,1),
-    weight_kg           DECIMAL(5,2),
-    activity_level      VARCHAR(20),              -- SEDENTARY / LIGHT / MODERATE / ACTIVE / VERY_ACTIVE
-    goal                VARCHAR(20),              -- LOSE / MAINTAIN / GAIN
-    target_calories     INTEGER,                  -- null = calculé automatiquement
-    macro_protein_pct   INTEGER DEFAULT 30,
-    macro_carbs_pct     INTEGER DEFAULT 45,
-    macro_fat_pct       INTEGER DEFAULT 25,
-    updated_at          TIMESTAMP DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    first_name VARCHAR(100),
+    birth_date DATE,
+    gender VARCHAR(10),           -- MALE / FEMALE / OTHER
+    height_cm DECIMAL(5,1),
+    weight_kg DECIMAL(5,2),
+    activity_level VARCHAR(20),   -- SEDENTARY / LIGHT / MODERATE / ACTIVE / VERY_ACTIVE
+    goal VARCHAR(20),             -- LOSE / MAINTAIN / GAIN
+    target_calories INTEGER,
+    macro_protein_pct INTEGER DEFAULT 30,
+    macro_carbs_pct INTEGER DEFAULT 45,
+    macro_fat_pct INTEGER DEFAULT 25,
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Ingrédients / Aliments
+-- Ingrédients
 CREATE TABLE ingredients (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name            VARCHAR(255) NOT NULL,
-    brand           VARCHAR(255),
-    barcode         VARCHAR(50),
-    category        VARCHAR(50),
-    calories_100g   DECIMAL(7,2) NOT NULL,
-    proteins_100g   DECIMAL(7,2),
-    carbs_100g      DECIMAL(7,2),
-    sugars_100g     DECIMAL(7,2),
-    fat_100g        DECIMAL(7,2),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    brand VARCHAR(255),
+    barcode VARCHAR(50),
+    category VARCHAR(50),
+    calories_100g DECIMAL(7,2) NOT NULL,
+    proteins_100g DECIMAL(7,2),
+    carbs_100g DECIMAL(7,2),
+    sugars_100g DECIMAL(7,2),
+    fat_100g DECIMAL(7,2),
     saturated_fat_100g DECIMAL(7,2),
-    fiber_100g      DECIMAL(7,2),
-    salt_100g       DECIMAL(7,2),
-    glycemic_index  INTEGER,
-    nutri_score     CHAR(1),                      -- A B C D E
-    allergens       TEXT[],                       -- array PostgreSQL
-    off_id          VARCHAR(100),                 -- Open Food Facts ID
-    is_custom       BOOLEAN DEFAULT FALSE,
-    user_id         UUID REFERENCES users(id),    -- null = aliment partagé / seed
-    created_at      TIMESTAMP DEFAULT NOW()
+    fiber_100g DECIMAL(7,2),
+    salt_100g DECIMAL(7,2),
+    glycemic_index INTEGER,
+    nutri_score CHAR(1),
+    off_id VARCHAR(100),
+    is_custom BOOLEAN DEFAULT FALSE,
+    user_id UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Recettes
 CREATE TABLE recipes (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID REFERENCES users(id) ON DELETE CASCADE,
-    name            VARCHAR(255) NOT NULL,
-    description     TEXT,
-    servings        INTEGER DEFAULT 1,
-    prep_time_min   INTEGER,
-    cook_time_min   INTEGER,
-    difficulty      VARCHAR(10),                  -- EASY / MEDIUM / HARD
-    is_healthy      BOOLEAN,
-    photo_url       VARCHAR(500),
-    tags            TEXT[],
-    created_at      TIMESTAMP DEFAULT NOW(),
-    updated_at      TIMESTAMP DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    servings INTEGER DEFAULT 1,
+    prep_time_min INTEGER,
+    cook_time_min INTEGER,
+    difficulty VARCHAR(10),       -- EASY / MEDIUM / HARD
+    is_healthy BOOLEAN,
+    photo_url VARCHAR(500),
+    tags JSONB,                   -- ajouté V8
+    nutrition_override JSONB,     -- ajouté V8 (forcer macros)
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Pivot recette ↔ ingrédient
 CREATE TABLE recipe_ingredients (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    recipe_id       UUID REFERENCES recipes(id) ON DELETE CASCADE,
-    ingredient_id   UUID REFERENCES ingredients(id),
-    quantity_g      DECIMAL(8,2) NOT NULL,
-    unit_label      VARCHAR(50)                   -- "2 œufs", "1 c.à.s."
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    recipe_id UUID REFERENCES recipes(id) ON DELETE CASCADE,
+    ingredient_id UUID REFERENCES ingredients(id),
+    quantity_g DECIMAL(8,2) NOT NULL,
+    unit_label VARCHAR(50),
+    is_resolved BOOLEAN DEFAULT TRUE   -- ajouté V8 (import JSON)
 );
 
--- Plan de repas (semaine)
+-- Plan de repas
 CREATE TABLE week_plans (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID REFERENCES users(id) ON DELETE CASCADE,
-    week_start      DATE NOT NULL,                -- lundi de la semaine
-    notes           TEXT,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    week_start DATE NOT NULL,
+    notes TEXT,
     UNIQUE(user_id, week_start)
 );
 
 -- Créneau repas
 CREATE TABLE meal_slots (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    week_plan_id    UUID REFERENCES week_plans(id) ON DELETE CASCADE,
-    slot_date       DATE NOT NULL,
-    meal_type       VARCHAR(20) NOT NULL,          -- BREAKFAST / LUNCH / DINNER / SNACK
-    recipe_id       UUID REFERENCES recipes(id),  -- null si saisie libre
-    free_label      VARCHAR(255),                 -- si pas de recette
-    portions        DECIMAL(4,2) DEFAULT 1,
-    is_deviation    BOOLEAN DEFAULT FALSE,
-    calories_override INTEGER,                    -- override si écart libre
-    is_consumed     BOOLEAN DEFAULT FALSE,
-    consumed_at     TIMESTAMP
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    week_plan_id UUID REFERENCES week_plans(id) ON DELETE CASCADE,
+    slot_date DATE NOT NULL,
+    meal_type VARCHAR(20) NOT NULL,    -- BREAKFAST / LUNCH / DINNER / SNACK
+    recipe_id UUID REFERENCES recipes(id),
+    free_label VARCHAR(255),
+    portions DECIMAL(4,2) DEFAULT 1,
+    is_deviation BOOLEAN DEFAULT FALSE,
+    calories_override INTEGER,
+    is_consumed BOOLEAN DEFAULT FALSE,
+    consumed_at TIMESTAMP,
+    -- ajoutés V5 :
+    prepared_meal_id UUID REFERENCES prepared_meals(id),
+    prepared_meal_portions DECIMAL(4,2) DEFAULT 1,
+    source_type VARCHAR(20) DEFAULT 'RECIPE'  -- RECIPE / PREPARED_MEAL / RESTAURANT / FREE
 );
 
--- Log journalier réel (ce qui a vraiment été mangé)
+-- Plats préparés (V5)
+CREATE TABLE prepared_meals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    brand VARCHAR(255),
+    barcode VARCHAR(50),
+    calories_per_portion DECIMAL(7,2),
+    proteins_per_portion DECIMAL(7,2),
+    carbs_per_portion DECIMAL(7,2),
+    fat_per_portion DECIMAL(7,2),
+    fiber_per_portion DECIMAL(7,2),
+    servings_per_package INTEGER DEFAULT 1,
+    nutri_score CHAR(1),
+    is_favorite BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Extras de repas (V6)
+CREATE TABLE meal_extras (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    meal_slot_id UUID REFERENCES meal_slots(id) ON DELETE CASCADE,
+    extra_type VARCHAR(20) NOT NULL DEFAULT 'OTHER',  -- INGREDIENT / PREPARED / FREE
+    ingredient_id UUID REFERENCES ingredients(id),
+    prepared_meal_id UUID REFERENCES prepared_meals(id),
+    label VARCHAR(255),
+    quantity_g DECIMAL(8,2),
+    calories_free DECIMAL(7,2),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Gabarits de plats restaurant (V7)
+CREATE TABLE dish_templates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    category VARCHAR(100),         -- Pizza, Burger, Sushi, etc.
+    cuisine VARCHAR(50),           -- FRENCH / ITALIAN / JAPANESE / CHINESE / OTHER
+    calories_estimate INTEGER,
+    proteins_estimate DECIMAL(6,2),
+    carbs_estimate DECIMAL(6,2),
+    fat_estimate DECIMAL(6,2),
+    source VARCHAR(50) DEFAULT 'CIQUAL'
+);
+
+-- Repas restaurant (V7)
+CREATE TABLE restaurant_meals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    meal_slot_id UUID REFERENCES meal_slots(id),
+    name VARCHAR(255),
+    restaurant_name VARCHAR(255),
+    method VARCHAR(20),            -- FREE / GUIDED / RECONSTRUCTED
+    total_calories DECIMAL(8,2),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Ingrédients d'un repas restaurant reconstruit (V7)
+CREATE TABLE restaurant_meal_ingredients (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    restaurant_meal_id UUID REFERENCES restaurant_meals(id) ON DELETE CASCADE,
+    ingredient_id UUID REFERENCES ingredients(id),
+    dish_template_id UUID REFERENCES dish_templates(id),
+    quantity_g DECIMAL(8,2),
+    label VARCHAR(255)
+);
+
+-- Log journalier
 CREATE TABLE daily_logs (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID REFERENCES users(id) ON DELETE CASCADE,
-    log_date        DATE NOT NULL,
-    total_calories  DECIMAL(8,2),
-    total_proteins  DECIMAL(8,2),
-    total_carbs     DECIMAL(8,2),
-    total_fat       DECIMAL(8,2),
-    total_fiber     DECIMAL(8,2),
-    weight_kg       DECIMAL(5,2),                 -- poids du jour (optionnel)
-    notes           TEXT,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    log_date DATE NOT NULL,
+    total_calories DECIMAL(8,2),
+    total_proteins DECIMAL(8,2),
+    total_carbs DECIMAL(8,2),
+    total_fat DECIMAL(8,2),
+    total_fiber DECIMAL(8,2),
+    weight_kg DECIMAL(5,2),
+    notes TEXT,
     UNIQUE(user_id, log_date)
 );
 
 -- Écarts alimentaires
 CREATE TABLE deviations (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID REFERENCES users(id) ON DELETE CASCADE,
-    deviation_date  DATE NOT NULL,
-    meal_slot_id    UUID REFERENCES meal_slots(id),
-    type            VARCHAR(10) NOT NULL,          -- PLANNED / UNPLANNED
-    label           VARCHAR(255),                  -- "Pizza royale", "Anniversaire"
-    calories_extra  INTEGER NOT NULL,
-    compensation_spread INTEGER DEFAULT 2,         -- nb de jours pour compenser
-    notes           TEXT,
-    created_at      TIMESTAMP DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    deviation_date DATE NOT NULL,
+    meal_slot_id UUID REFERENCES meal_slots(id),
+    type VARCHAR(10) NOT NULL,     -- PLANNED / UNPLANNED
+    label VARCHAR(255),
+    calories_extra INTEGER NOT NULL,
+    compensation_spread INTEGER DEFAULT 2,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Liste de courses
 CREATE TABLE shopping_lists (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID REFERENCES users(id) ON DELETE CASCADE,
-    week_plan_id    UUID REFERENCES week_plans(id),
-    name            VARCHAR(255),
-    created_at      TIMESTAMP DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    week_plan_id UUID REFERENCES week_plans(id),
+    name VARCHAR(255),
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE shopping_items (
-    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    shopping_list_id    UUID REFERENCES shopping_lists(id) ON DELETE CASCADE,
-    ingredient_id       UUID REFERENCES ingredients(id),
-    label               VARCHAR(255) NOT NULL,
-    quantity_g          DECIMAL(8,2),
-    unit_label          VARCHAR(50),
-    category            VARCHAR(50),
-    is_checked          BOOLEAN DEFAULT FALSE,
-    is_manual           BOOLEAN DEFAULT FALSE
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shopping_list_id UUID REFERENCES shopping_lists(id) ON DELETE CASCADE,
+    ingredient_id UUID REFERENCES ingredients(id),
+    label VARCHAR(255) NOT NULL,
+    quantity_g DECIMAL(8,2),
+    unit_label VARCHAR(50),
+    category VARCHAR(50),
+    is_checked BOOLEAN DEFAULT FALSE,
+    is_manual BOOLEAN DEFAULT FALSE
 );
 ```
 
-### 6.2 Index recommandés
+### 6.2 SQLite — Catalogue Open Food Facts (`off_catalog.db`)
 
 ```sql
-CREATE INDEX idx_meal_slots_week_plan ON meal_slots(week_plan_id);
-CREATE INDEX idx_meal_slots_date ON meal_slots(slot_date);
-CREATE INDEX idx_daily_logs_user_date ON daily_logs(user_id, log_date);
-CREATE INDEX idx_deviations_user_date ON deviations(user_id, deviation_date);
-CREATE INDEX idx_ingredients_barcode ON ingredients(barcode);
-CREATE INDEX idx_ingredients_name ON ingredients USING gin(to_tsvector('french', name));
+CREATE TABLE products (
+    barcode TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    name_fr TEXT,
+    brand TEXT,
+    calories_100g REAL,
+    proteins_100g REAL,
+    carbs_100g REAL,
+    sugars_100g REAL,
+    fat_100g REAL,
+    saturated_fat_100g REAL,
+    fiber_100g REAL,
+    salt_100g REAL,
+    nutri_score TEXT
+);
+
+CREATE INDEX idx_products_name ON products(name COLLATE NOCASE);
+CREATE INDEX idx_products_name_fr ON products(name_fr COLLATE NOCASE);
+CREATE INDEX idx_products_brand ON products(brand COLLATE NOCASE);
 ```
+
+Généré par `tools/off-import/` depuis le dump JSONL OFF (~11 GB compressé).  
+Critères de filtrage : `bestName()` non null ET `calories_100g > 0`.
 
 ---
 
 ## 7. API REST
 
-### 7.1 Endpoints Auth
+### 7.1 Auth
 
 | Méthode | Endpoint | Description |
 |---|---|---|
@@ -600,198 +760,173 @@ CREATE INDEX idx_ingredients_name ON ingredients USING gin(to_tsvector('french',
 | POST | `/api/auth/login` | Connexion → JWT |
 | GET | `/api/auth/me` | Profil courant |
 
-### 7.2 Endpoints User/Profile
+### 7.2 Profil utilisateur
 
 | Méthode | Endpoint | Description |
 |---|---|---|
 | GET | `/api/profile` | Récupérer le profil |
-| PUT | `/api/profile` | Mettre à jour le profil |
-| GET | `/api/profile/objectives` | Objectifs calculés (TDEE, macros) |
+| PUT | `/api/profile` | Mettre à jour |
+| GET | `/api/profile/objectives` | Objectifs calculés (BMR, TDEE, macros) |
 
-### 7.3 Endpoints Ingrédients
+### 7.3 Ingrédients
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/api/ingredients?q=tomate` | Recherche textuelle |
+| GET | `/api/ingredients?q=` | Recherche textuelle (base locale) |
+| GET | `/api/ingredients/{id}` | Détail |
 | GET | `/api/ingredients/barcode/{ean}` | Recherche par code-barres |
-| GET | `/api/ingredients/{id}` | Détail d'un ingrédient |
 | POST | `/api/ingredients` | Créer ingrédient custom |
 | PUT | `/api/ingredients/{id}` | Modifier |
 | DELETE | `/api/ingredients/{id}` | Supprimer (custom only) |
-| GET | `/api/ingredients/import/off?q={query}` | Import depuis Open Food Facts |
-| GET | `/api/ingredients/import/barcode/{ean}` | Import par code-barres Open Food Facts |
+| GET | `/api/ingredients/import/barcode/{ean}` | Import par barcode (catalogue OFF puis API OFF en fallback) |
 
-#### 7.3.1 Détail d'un ingrédient — Réponse
-
-```json
-// GET /api/ingredients/{id}
-{
-  "id": "uuid",
-  "name": "Tomate",
-  "brand": null,
-  "barcode": null,
-  "category": "Légumes",
-  "calories100g": 18.00,
-  "proteins100g": 0.90,
-  "carbs100g": 3.50,
-  "sugars100g": 3.20,
-  "fat100g": 0.20,
-  "saturatedFat100g": null,
-  "fiber100g": 1.20,
-  "salt100g": 0.01,
-  "glycemicIndex": null,
-  "nutriScore": "A",
-  "offId": null,
-  "isCustom": false,
-  "createdAt": "2026-04-01T10:00:00"
-}
-```
-
-#### 7.3.2 Recherche textuelle — Paramètres & Réponse
-
-```
-GET /api/ingredients?q=poulet
-Authorization: Bearer <token>
-```
-
-Retourne un tableau d'ingrédients correspondant à la recherche (base locale + ingrédients custom de l'utilisateur), triés par nom.
-
-```json
-[
-  {
-    "id": "uuid",
-    "name": "Poulet (blanc)",
-    "category": "Viandes & Poissons",
-    "calories100g": 165.00,
-    "proteins100g": 31.00,
-    "carbs100g": 0.00,
-    "fat100g": 3.60,
-    "nutriScore": "B",
-    "isCustom": false
-  }
-]
-```
-
-#### 7.3.3 Recherche par code-barres — Flux complet
-
-```
-1. Scan EAN dans l'app → GET /api/ingredients/barcode/{ean}
-   → 200 : ingrédient trouvé en base locale → utiliser directement
-   → 404 : pas en base
-
-2. Si 404 → GET /api/ingredients/import/barcode/{ean}
-   → Appel Open Food Facts API
-   → Sauvegarde automatique en base
-   → 200 : retourne l'ingrédient importé
-   → 404 : produit inconnu d'Open Food Facts
-```
-
-#### 7.3.4 Créer un ingrédient custom — Corps de requête
-
-```json
-// POST /api/ingredients
-{
-  "name": "Mon granola maison",
-  "category": "Épicerie",
-  "calories100g": 420,
-  "proteins100g": 9.5,
-  "carbs100g": 58.0,
-  "sugars100g": 18.0,
-  "fat100g": 16.0,
-  "saturatedFat100g": 3.2,
-  "fiber100g": 5.5,
-  "salt100g": 0.08
-}
-```
-
-L'ingrédient est automatiquement associé à l'utilisateur (`isCustom: true`, `userId` extrait du JWT).
-
-#### 7.3.5 Import Open Food Facts — Comportement
-
-```
-GET /api/ingredients/import/off?q=nutella
-```
-
-- Interroge l'API Open Food Facts (`/search?search_terms=nutella&page_size=20`)
-- Retourne jusqu'à 20 résultats **sans** les sauvegarder en base
-- Le frontend affiche les résultats et l'utilisateur choisit quoi importer
-- Pour sauvegarder un résultat : `POST /api/ingredients` avec les données de l'ingrédient sélectionné
-
-Champs mappés depuis Open Food Facts :
-
-| Champ OFF | Champ local |
-|---|---|
-| `energy-kcal_100g` | `calories100g` |
-| `proteins_100g` | `proteins100g` |
-| `carbohydrates_100g` | `carbs100g` |
-| `sugars_100g` | `sugars100g` |
-| `fat_100g` | `fat100g` |
-| `saturated-fat_100g` | `saturatedFat100g` |
-| `fiber_100g` | `fiber100g` |
-| `salt_100g` | `salt100g` |
-| `nutriscore_grade` | `nutriScore` |
-| `code` | `barcode` + `offId` |
-
-### 7.4 Endpoints Recettes
+### 7.4 Catalogue OFF (local)
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/api/recipes` | Liste des recettes |
+| GET | `/api/off-catalog/status` | `{ available, productCount, path }` |
+| GET | `/api/off-catalog/search?q=` | Recherche dans `off_catalog.db` (LIMIT 30) |
+
+Retourne des objets `IngredientEntity` directement utilisables dans l'app.  
+Si `off_catalog.db` est absent : `available: false`, `search` retourne `[]`.
+
+### 7.5 Ciqual
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/api/ciqual/status` | `{ count, importing, lastResult }` |
+| POST | `/api/ciqual/import` | Déclenche l'import en arrière-plan (202 Accepted) |
+
+L'import est **asynchrone** (thread virtuel Java 21). Le client poll `/status` pour suivre la progression.  
+Erreur 409 si un import est déjà en cours.
+
+### 7.7 Recettes
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/api/recipes` | Liste |
 | GET | `/api/recipes/{id}` | Détail |
 | POST | `/api/recipes` | Créer |
 | PUT | `/api/recipes/{id}` | Modifier |
 | DELETE | `/api/recipes/{id}` | Supprimer |
 | GET | `/api/recipes/{id}/nutrition` | Valeurs nutritionnelles calculées |
+| POST | `/api/recipes/import` | Import JSON (multipart `file` + `overwrite`) |
 
-### 7.5 Endpoints Planning
+#### Import JSON — Corps de requête
+
+```json
+{
+  "name": "Poulet rôti aux légumes",
+  "servings": 4,
+  "tags": ["healthy", "protéiné"],
+  "ingredients": [
+    { "name": "Poulet (blanc)", "quantityG": 400 },
+    { "name": "Tomate", "barcode": "3017620422003", "quantityG": 200 }
+  ]
+}
+```
+
+#### Import JSON — Réponse
+
+```json
+{
+  "status": "PARTIAL_SUCCESS",
+  "recipeId": "uuid",
+  "recipeName": "Poulet rôti aux légumes",
+  "servings": 4,
+  "resolvedCount": 1,
+  "unresolvedIngredients": [
+    { "tempId": "tmp-1", "name": "Poulet (blanc)", "quantity": "400", "unit": "g" }
+  ],
+  "warnings": []
+}
+```
+
+### 7.8 Planning
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/api/plans?week=2026-03-30` | Planning de la semaine |
+| GET | `/api/plans?week=2026-04-07` | Planning de la semaine |
 | POST | `/api/plans` | Créer un planning |
-| POST | `/api/plans/{id}/slots` | Ajouter un créneau repas |
+| POST | `/api/plans/{id}/slots` | Ajouter un créneau |
 | PUT | `/api/plans/slots/{slotId}` | Modifier un créneau |
 | DELETE | `/api/plans/slots/{slotId}` | Supprimer un créneau |
-| POST | `/api/plans/{id}/copy` | Copier vers une autre semaine |
+| GET | `/api/plans/slots/{slotId}` | Détail d'un créneau |
+| GET | `/api/plans/slots/{slotId}/nutrition` | Nutrition du créneau |
 | PUT | `/api/plans/slots/{slotId}/consume` | Marquer comme consommé |
+| POST | `/api/plans/{id}/copy` | Copier vers une autre semaine |
 
-### 7.6 Endpoints Liste de courses
+### 7.9 Plats préparés
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/api/prepared-meals` | Liste |
+| GET | `/api/prepared-meals/{id}` | Détail |
+| POST | `/api/prepared-meals` | Créer |
+| PUT | `/api/prepared-meals/{id}` | Modifier |
+| DELETE | `/api/prepared-meals/{id}` | Supprimer |
+| POST | `/api/prepared-meals/from-barcode/{ean}` | Import depuis catalogue OFF |
+| PUT | `/api/prepared-meals/{id}/favorite` | Toggle favori |
+| GET | `/api/prepared-meals/favorites` | Liste des favoris |
+
+### 7.10 Extras de repas
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/api/meal-slots/{slotId}/extras` | Liste des extras |
+| POST | `/api/meal-slots/{slotId}/extras` | Ajouter un extra |
+| PUT | `/api/meal-slots/{slotId}/extras/{extraId}` | Modifier |
+| DELETE | `/api/meal-slots/{slotId}/extras/{extraId}` | Supprimer |
+| GET | `/api/meal-slots/{slotId}/nutrition-total` | Total créneau + extras |
+
+### 7.11 Repas restaurant
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/api/dish-templates?q=&category=` | Recherche de gabarits |
+| GET | `/api/restaurant-meals` | Liste |
+| POST | `/api/restaurant-meals` | Créer |
+| GET | `/api/restaurant-meals/{id}` | Détail |
+| PUT | `/api/restaurant-meals/{id}` | Modifier |
+| DELETE | `/api/restaurant-meals/{id}` | Supprimer |
+
+### 7.12 Liste de courses
 
 | Méthode | Endpoint | Description |
 |---|---|---|
 | GET | `/api/shopping?weekPlanId={id}` | Générer / récupérer liste |
 | POST | `/api/shopping/{id}/items` | Ajouter item manuel |
-| PUT | `/api/shopping/items/{itemId}/check` | Cocher/décocher item |
+| PUT | `/api/shopping/items/{itemId}/check` | Cocher/décocher |
 | DELETE | `/api/shopping/items/{itemId}` | Supprimer item |
-| GET | `/api/shopping/{id}/export` | Export texte de la liste |
 
-### 7.7 Endpoints Nutrition & Écarts
+### 7.13 Nutrition & Écarts
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/api/nutrition/log?date=2026-04-01` | Log journalier |
-| PUT | `/api/nutrition/log/{date}` | Mettre à jour le log |
+| GET | `/api/nutrition/log?date=` | Log journalier |
+| PUT | `/api/nutrition/log/{date}` | Mettre à jour |
 | GET | `/api/nutrition/stats?from=&to=` | Stats sur une période |
 | POST | `/api/nutrition/deviations` | Déclarer un écart |
-| GET | `/api/nutrition/deviations` | Historique des écarts |
-| GET | `/api/nutrition/deviations/compensation` | Plan de compensation actif |
+| GET | `/api/nutrition/deviations` | Historique |
 
-### 7.8 Endpoints Analytics
-
-| Méthode | Endpoint | Description |
-|---|---|---|
-| GET | `/api/analytics/daily?date=` | Données graphiques journalières |
-| GET | `/api/analytics/weekly?week=` | Données graphiques hebdomadaires |
-| GET | `/api/analytics/monthly?month=` | Données graphiques mensuelles |
-| GET | `/api/analytics/trends?period=` | Tendances poids + calories |
-
-### 7.9 Endpoints Export
+### 7.14 Export PDF
 
 | Méthode | Endpoint | Description |
 |---|---|---|
 | GET | `/api/export/weekly-report?week=` | PDF bilan semaine |
-| GET | `/api/export/monthly-report?month=` | PDF bilan mensuel |
 | GET | `/api/export/shopping-list?weekPlanId=` | PDF liste de courses |
+
+### 7.15 Format d'erreur (GlobalExceptionHandler)
+
+Toutes les erreurs retournent un JSON normalisé :
+
+```json
+{
+  "error": "Message d'erreur lisible",
+  "status": 502,
+  "timestamp": "2026-04-05T14:32:00"
+}
+```
 
 ---
 
@@ -804,56 +939,31 @@ Homme : BMR = (10 × poids_kg) + (6.25 × taille_cm) - (5 × âge) + 5
 Femme : BMR = (10 × poids_kg) + (6.25 × taille_cm) - (5 × âge) - 161
 ```
 
-### 8.2 Calcul du TDEE (Total Daily Energy Expenditure)
+### 8.2 TDEE
 
 | Niveau d'activité | Multiplicateur |
 |---|---|
-| Sédentaire (bureau, peu de sport) | BMR × 1.2 |
-| Légèrement actif (1-3 jours/semaine) | BMR × 1.375 |
-| Modérément actif (3-5 jours/semaine) | BMR × 1.55 |
-| Très actif (6-7 jours/semaine) | BMR × 1.725 |
-| Extrêmement actif (sport intense + travail physique) | BMR × 1.9 |
+| Sédentaire | BMR × 1.2 |
+| Légèrement actif | BMR × 1.375 |
+| Modérément actif | BMR × 1.55 |
+| Très actif | BMR × 1.725 |
+| Extrêmement actif | BMR × 1.9 |
 
-### 8.3 Ajustement selon l'objectif
+### 8.3 Ajustement objectif
 
 | Objectif | Ajustement |
 |---|---|
-| Perte de poids | TDEE - 20% (déficit modéré) |
+| Perte de poids | TDEE - 20% |
 | Maintien | TDEE |
 | Prise de masse | TDEE + 15% |
 
-### 8.4 Calcul nutritionnel d'une recette
+### 8.4 Calcul nutritionnel d'un créneau
 
 ```
-Pour chaque ingrédient i avec quantité q_i (grammes) :
-  calories_i = (ingredients[i].calories_100g / 100) × q_i
+slot_calories = recipe_nutrition_per_portion × portions
 
-total_calories_recette = Σ calories_i
-calories_par_portion = total_calories_recette / nb_portions
-```
-
-Idem pour chaque macro (protéines, glucides, lipides, fibres).
-
-### 8.5 Critères "healthy"
-
-Une recette est taguée **healthy** si elle remplit au moins 3 des 5 critères suivants (configurables) :
-
-1. Calories par portion ≤ 600 kcal
-2. Lipides saturés ≤ 5 g / portion
-3. Fibres ≥ 3 g / portion
-4. Sucres ≤ 10 g / portion
-5. Nutri-Score de l'ingrédient principal ≥ B
-
-### 8.6 Logique de compensation des écarts
-
-```
-surplus = calories_ecart - calories_objectif_jour_J
-nb_jours_compensation = user.compensation_spread  (défaut: 2)
-reduction_par_jour = surplus / nb_jours_compensation
-
-Pour chaque jour J+1 à J+n :
-  objectif_ajuste[J+n] = objectif_de_base - reduction_par_jour
-  (avec plancher : objectif_ajuste ≥ BMR)
+total_slot = slot_calories
+           + Σ extra_calories (INGREDIENT: q/100 × cal100g | PREPARED: cal_portion | FREE: calories_free)
 ```
 
 ---
@@ -863,246 +973,151 @@ Pour chaque jour J+1 à J+n :
 ### 9.1 Graphiques disponibles
 
 #### Vue journalière
-- **Anneau de calories** : consommé vs objectif (couleur selon seuil)
-- **Barres macros** : protéines / glucides / lipides (g et % de l'objectif)
-- **Timeline repas** : heures de consommation sur la journée
-- **Score healthy** : nb de repas healthy du jour sur total
+- Anneau de calories : consommé vs objectif
+- Barres macros : protéines / glucides / lipides
+- Score healthy du jour
 
 #### Vue hebdomadaire
-- **Histogramme calories** : bar chart 7 jours, ligne objectif superposée
-- **Répartition macros** : stacked bar chart par jour
-- **Jours dans l'objectif** : compteur avec indicateur couleur
-- **Récapitulatif écarts** : badges sur les jours concernés
+- Histogramme calories 7 jours + ligne objectif
+- Répartition macros en stacked bar
+- Badges écarts sur les jours concernés
 
 #### Vue mensuelle
-- **Tendance calories** : courbe lissée sur 30 jours
-- **Évolution du poids** : courbe poids si données saisies
-- **Heatmap** : calendrier mensuel coloré selon le niveau de respect de l'objectif
-- **Comparatif semaines** : bar chart des moyennes caloriquest par semaine
-
-#### Tendances générales
-- **Moyenne mobile 7 jours** : calories lissées
-- **Fréquence des écarts** : histogramme mensuel
-- **Progression macros** : radarChart (protéines, glucides, lipides, fibres vs objectifs)
-
-### 9.2 Implémentation Victory Native
-
-```typescript
-// Exemple graphique calories semaine
-import { VictoryBar, VictoryLine, VictoryChart, VictoryTheme, VictoryAxis } from 'victory-native';
-
-const WeeklyCaloriesChart = ({ data, target }) => (
-  <VictoryChart theme={VictoryTheme.material} domainPadding={20}>
-    <VictoryAxis tickFormat={(d) => format(new Date(d), 'EEE', { locale: fr })} />
-    <VictoryAxis dependentAxis />
-    <VictoryBar
-      data={data}
-      x="date"
-      y="calories"
-      style={{ data: { fill: ({ datum }) =>
-        datum.calories > target ? '#E74C3C' :
-        datum.calories > target * 0.9 ? '#F39C12' : '#2ECC71'
-      }}}
-    />
-    <VictoryLine
-      y={() => target}
-      style={{ data: { stroke: '#3498DB', strokeDasharray: '4,4' } }}
-    />
-  </VictoryChart>
-);
-```
-
-### 9.3 Données renvoyées par l'API analytics
-
-```json
-// GET /api/analytics/weekly?week=2026-03-30
-{
-  "weekStart": "2026-03-30",
-  "dailyStats": [
-    {
-      "date": "2026-03-30",
-      "calories": 1820,
-      "proteins": 95,
-      "carbs": 220,
-      "fat": 62,
-      "fiber": 28,
-      "target": 1900,
-      "isDeviation": false,
-      "isHealthyDay": true
-    }
-  ],
-  "weekSummary": {
-    "avgCalories": 1875,
-    "totalCalories": 13125,
-    "daysInTarget": 5,
-    "deviationsCount": 1,
-    "avgProteins": 98,
-    "avgCarbs": 225,
-    "avgFat": 65
-  }
-}
-```
+- Courbe tendance calories lissée
+- Évolution du poids si données saisies
+- Heatmap calendrier mensuel
 
 ---
 
 ## 10. Export PDF
 
-### 10.1 Contenu des PDFs générés
+### 10.1 Bilan semaine
 
-#### Bilan semaine (PDF)
-1. En-tête Mealing + semaine concernée + profil utilisateur
+1. En-tête Mealing + semaine + profil utilisateur
 2. Résumé : total calories, moyenne/jour, jours dans l'objectif
 3. Tableau jour par jour : repas planifiés, calories, macros
-4. Graphique calories semaine (image SVG exportée)
-5. Graphique macros (image SVG exportée)
-6. Section écarts : tableau des écarts + compensation appliquée
-7. Pied de page : date de génération
+4. Section écarts et compensation appliquée
 
-#### Liste de courses (PDF)
-1. En-tête : semaine concernée
-2. Liste groupée par rayon/catégorie avec quantités
-3. Case à cocher pour chaque item (format imprimable)
+### 10.2 Liste de courses PDF
 
-### 10.2 Génération backend (Spring Boot + OpenHTMLToPDF)
-
-```java
-@Service
-public class PdfExportService {
-
-    @Autowired
-    private TemplateEngine templateEngine;  // Thymeleaf
-
-    public byte[] generateWeeklyReport(String userId, LocalDate weekStart) {
-        // 1. Récupérer les données
-        WeeklyReportData data = nutritionService.getWeeklyReportData(userId, weekStart);
-
-        // 2. Rendre le template HTML Thymeleaf
-        Context context = new Context();
-        context.setVariable("data", data);
-        String html = templateEngine.process("weekly-report", context);
-
-        // 3. Convertir HTML → PDF
-        try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
-            PdfRendererBuilder builder = new PdfRendererBuilder();
-            builder.withHtmlContent(html, null);
-            builder.toStream(os);
-            builder.run();
-            return os.toByteArray();
-        }
-    }
-}
-```
-
-### 10.3 Affichage / partage PDF sur Android (React Native)
-
-```typescript
-import RNPrint from 'react-native-print';
-import { Platform, Share } from 'react-native';
-
-const exportWeeklyReport = async (weekStart: string) => {
-  const response = await api.get(`/export/weekly-report?week=${weekStart}`, {
-    responseType: 'blob'
-  });
-  const base64 = await blobToBase64(response.data);
-  const filePath = `${RNFS.CachesDirectoryPath}/mealing-report-${weekStart}.pdf`;
-  await RNFS.writeFile(filePath, base64, 'base64');
-
-  // Ouvrir avec la visionneuse PDF Android ou partager
-  await RNPrint.print({ filePath });
-};
-```
+1. En-tête : semaine
+2. Liste groupée par rayon/catégorie
+3. Cases à cocher (format imprimable)
 
 ---
 
 ## 11. Sécurité & authentification
 
-### 11.1 Flux d'authentification JWT
+### 11.1 Flux JWT
 
 ```
-1. POST /api/auth/login → { email, password }
-2. Backend vérifie password (BCrypt)
-3. Génère JWT signé (HS256) avec { userId, email, exp: +24h }
-4. Retourne { token, user }
-5. Mobile stocke le token dans AsyncStorage (chiffré)
-6. Chaque requête : Authorization: Bearer <token>
-7. Spring Security filtre JWT avant chaque requête protégée
+POST /api/auth/login → { email, password }
+→ BCrypt verify
+→ JWT HS256 signé (userId, email, exp: +24h)
+→ Mobile stocke en AsyncStorage
+→ Authorization: Bearer <token> sur chaque requête
+→ JwtAuthFilter vérifie avant chaque endpoint protégé
 ```
 
-### 11.2 Configuration Spring Security
+### 11.2 Isolation des données
 
-```java
-@Configuration
-@EnableWebSecurity
-public class SecurityConfig {
-
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        return http
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(sm -> sm.sessionCreationPolicy(STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/swagger-ui/**", "/api-docs/**").permitAll()
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-            .build();
-    }
-}
-```
-
-### 11.3 Sécurité des données
-
-- Tous les endpoints filtrent par `userId` extrait du JWT (isolation des données)
-- Pas de données partagées entre utilisateurs
-- Mots de passe hashés avec BCrypt (strength 12)
-- Token JWT invalide après déconnexion (blacklist en mémoire Redis ou simple expiration)
+- Tous les endpoints filtrent par `userId` extrait du JWT
+- Mots de passe hashés BCrypt (strength 12)
 - HTTPS obligatoire en production
 
 ---
 
-## 12. Roadmap & phases de développement
+## 12. Outil OFF Catalog
 
-### Phase 1 — Fondations (3-4 semaines)
-- [ ] Setup Spring Boot + PostgreSQL + Flyway
-- [ ] Authentification JWT (register, login)
-- [ ] Profil utilisateur + calcul TDEE
-- [ ] Modèle BDD complet + migrations
-- [ ] Import seed d'aliments courants (50-100 aliments)
-- [ ] Intégration Open Food Facts API
-- [ ] Écran login/register React Native
-- [ ] Écran profil setup
+### 12.1 But
 
-### Phase 2 — Recettes & Planning (3-4 semaines)
-- [ ] CRUD ingrédients (recherche, scan CB, custom)
-- [ ] CRUD recettes avec calcul nutritionnel
-- [ ] Planning hebdomadaire (backend + API)
-- [ ] Écran planning semaine (calendrier)
-- [ ] Écran ajout recette à un créneau
+Générer `off_catalog.db` (SQLite) depuis le dump JSONL Open Food Facts (~11 GB compressé).  
+Outil Java standalone dans `tools/off-import/`.
 
-### Phase 3 — Courses & Suivi (2-3 semaines)
-- [ ] Génération liste de courses
+### 12.2 Utilisation
+
+```bash
+# Télécharger le dump
+curl -o openfoodfacts-products.jsonl.gz \
+  https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz
+
+# Décompresser
+gzip -d openfoodfacts-products.jsonl.gz
+
+# Compiler l'outil
+cd tools/off-import
+mvn package -q
+
+# Générer le catalogue (placer le résultat à la racine du projet)
+java -jar target/off-import.jar openfoodfacts-products.jsonl ../../off_catalog.db
+```
+
+### 12.3 Schéma de filtrage
+
+Produit retenu si :
+- `bestName()` non null (nom_fr → nom générique → nom_en)
+- `energy-kcal_100g > 0`
+
+Insérés par batch de 5000 avec transaction SQLite (WAL mode, synchronous=NORMAL).
+
+### 12.4 Résultat attendu
+
+| Métrique | Valeur approximative |
+|---|---|
+| Produits retenus | 3–5 millions |
+| Taille `off_catalog.db` | 300–600 MB |
+| Durée de génération | 15–30 min |
+
+---
+
+## 13. Roadmap & état d'avancement
+
+### Phase 1 — Fondations ✅
+- [x] Spring Boot + PostgreSQL + Flyway
+- [x] Authentification JWT (register, login, me)
+- [x] Profil utilisateur + calcul TDEE/macros
+- [x] Modèle BDD (V1-V4) + seeds ingrédients
+- [x] Écrans login/register + profil setup
+
+### Phase 2 — Recettes & Planning ✅
+- [x] CRUD ingrédients (recherche, barcode, custom)
+- [x] CRUD recettes avec calcul nutritionnel
+- [x] Planning hebdomadaire complet
+- [x] Écran planning + ajout créneau
+- [x] Import JSON de recettes
+
+### Phase 3 — Écarts & Extras ✅
+- [x] Plats préparés (V5 + 8 endpoints + import barcode)
+- [x] Extras de créneaux (V6, 3 modes)
+- [x] Repas restaurant (V7, 3 méthodes, ~70 gabarits)
+- [x] Calcul nutrition totale créneau + extras
+- [x] Onglets Ingrédients et Plats dans la navigation
+
+### Phase 4 — Catalogue OFF local & Ciqual ✅
+- [x] Outil Java `off-import` (JSONL → SQLite)
+- [x] `OffCatalogService` + `OffCatalogController`
+- [x] Statut catalogue OFF dans Paramètres
+- [x] Écran recherche unifié avec toggle Générique (Ciqual) / Marque (OFF)
+- [x] `CiqualService` + `CiqualController` (import CSV ANSES asynchrone)
+- [x] Statut Ciqual dans Paramètres (compteur + bouton import)
+- [x] Colonne `source` sur `ingredients` (migration V9)
+- [x] Fix navigation retour plats préparés (onglet direct, plus de redirect)
+
+### Phase 5 — Liste de courses & Analytics 🔄
+- [ ] Génération liste de courses depuis planning
 - [ ] Écran liste de courses (cochage interactif)
 - [ ] Log journalier (marquer repas consommés)
 - [ ] Dashboard jour (anneau calories, macros)
-- [ ] Gestion des écarts (prévu + imprévu)
-- [ ] Calcul et affichage compensation
+- [ ] Gestion écarts prévu / imprévu
+- [ ] Graphiques semaine / mois
 
-### Phase 4 — Analytics & Export (2-3 semaines)
-- [ ] API analytics (jour / semaine / mois)
-- [ ] Écran graphiques semaine (Victory Native)
-- [ ] Écran graphiques mois (tendance, heatmap)
+### Phase 6 — Export & Finitions
 - [ ] Templates PDF Thymeleaf
-- [ ] Service génération PDF backend
-- [ ] Écran export + partage PDF Android
-
-### Phase 5 — Finitions & UX (2 semaines)
-- [ ] Notifications Android (rappels repas, objectif atteint)
-- [ ] Mode hors-ligne (cache AsyncStorage)
-- [ ] Paramètres (thème, objectifs, allergènes)
-- [ ] Tests (JUnit backend, Jest mobile)
+- [ ] Service génération PDF
+- [ ] Écran export PDF
+- [ ] Notifications Android
+- [ ] Tests JUnit / Jest
 - [ ] Dockerisation complète
-- [ ] Documentation API Swagger finale
 
 ---
 
@@ -1118,10 +1133,11 @@ DB_NAME=mealing
 DB_USER=mealing
 DB_PASSWORD=secret
 JWT_SECRET=your-256-bit-secret
-JWT_EXPIRATION=86400000
+OFF_CATALOG_PATH=/chemin/vers/off_catalog.db   # optionnel, défaut: off_catalog.db (user.dir)
 
-# Mobile (dans .env)
-API_BASE_URL=http://10.0.2.2:8080  # émulateur Android → localhost
+# Mobile (dans .env ou app.config.js)
+API_BASE_URL=http://10.0.2.2:8080   # émulateur Android → localhost
+# ou http://localhost:8080 pour expo web
 ```
 
 ### B. Docker Compose
@@ -1146,57 +1162,15 @@ services:
       - "8080:8080"
     environment:
       DB_HOST: postgres
-      JWT_SECRET: ${JWT_SECRET}
+      DB_USER: mealing
+      DB_PASSWORD: secret
+      JWT_SECRET: changeme
+      OFF_CATALOG_PATH: /data/off_catalog.db
+    volumes:
+      - ./off_catalog.db:/data/off_catalog.db:ro
     depends_on:
       - postgres
-
-  pgadmin:
-    image: dpage/pgadmin4
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@mealing.app
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "5050:80"
 
 volumes:
   postgres_data:
 ```
-
-### C. Open Food Facts — exemple d'appel
-
-```java
-@Service
-public class OpenFoodFactsClient {
-
-    private final WebClient webClient;
-
-    public OpenFoodFactsClient(WebClient.Builder builder,
-                                @Value("${mealing.open-food-facts.base-url}") String baseUrl) {
-        this.webClient = builder.baseUrl(baseUrl).build();
-    }
-
-    public Mono<List<IngredientDTO>> searchByName(String query) {
-        return webClient.get()
-            .uri(u -> u.path("/search")
-                .queryParam("search_terms", query)
-                .queryParam("fields", "product_name,nutriments,nutriscore_grade,allergens,code")
-                .queryParam("page_size", 20)
-                .build())
-            .retrieve()
-            .bodyToMono(OFFSearchResponse.class)
-            .map(OFFMapper::toIngredientDTOs);
-    }
-
-    public Mono<IngredientDTO> searchByBarcode(String ean) {
-        return webClient.get()
-            .uri("/product/{ean}", ean)
-            .retrieve()
-            .bodyToMono(OFFProductResponse.class)
-            .map(OFFMapper::toIngredientDTO);
-    }
-}
-```
-
----
-
-*Document généré pour le projet Mealing — Tous droits réservés*

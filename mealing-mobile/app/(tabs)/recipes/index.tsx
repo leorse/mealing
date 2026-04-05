@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet } from 'react-native';
-import { Text, Searchbar, Card, Chip, FAB, ActivityIndicator, IconButton, Tooltip } from 'react-native-paper';
+import { View, FlatList, StyleSheet, Alert } from 'react-native';
+import { Text, Searchbar, Card, Chip, FAB, ActivityIndicator, IconButton } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { useRecipeStore } from '../../src/store/useRecipeStore';
-import { Recipe } from '../../src/api/recipes';
+import { useRecipeStore } from '../../../src/store/useRecipeStore';
+import { Recipe } from '../../../src/api/recipes';
 
 const DIFFICULTY_LABELS: Record<string, string> = { EASY: 'Facile', MEDIUM: 'Moyen', HARD: 'Élaboré' };
 const DIFFICULTY_COLORS: Record<string, string> = { EASY: '#DCFCE7', MEDIUM: '#FEF9C3', HARD: '#FEE2E2' };
@@ -21,6 +21,13 @@ export default function RecipesScreen() {
     r.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleDelete = (recipe: Recipe) => {
+    Alert.alert('Supprimer', `Supprimer "${recipe.name}" ?`, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: () => deleteRecipe(recipe.id) },
+    ]);
+  };
+
   return (
     <View style={styles.container}>
       <Searchbar
@@ -36,33 +43,29 @@ export default function RecipesScreen() {
         <FlatList
           data={filtered}
           keyExtractor={(r) => r.id}
-          contentContainerStyle={{ padding: 16, paddingBottom: 80 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyText}>Aucune recette. Créez-en une !</Text>
+              <Text style={styles.emptyText}>
+                {search ? 'Aucun résultat' : 'Aucune recette. Créez-en une !'}
+              </Text>
             </View>
           }
           renderItem={({ item }) => (
             <RecipeCard
               recipe={item}
-              onPress={() => router.push(`/recipes/${item.id}`)}
-              onDelete={() => deleteRecipe(item.id)}
+              onPress={() => router.push(`/(tabs)/recipes/${item.id}`)}
+              onDelete={() => handleDelete(item)}
             />
           )}
         />
       )}
 
-      <FAB.Group
-        open={false}
-        visible
+      <FAB
         icon="plus"
+        style={styles.fab}
         color="white"
-        fabStyle={styles.fab}
-        actions={[
-          { icon: 'file-upload', label: 'Importer (JSON)', onPress: () => router.push('/recipes/import' as any) },
-          { icon: 'pencil-plus', label: 'Créer manuellement', onPress: () => router.push('/recipes/new') },
-        ]}
-        onStateChange={() => {}}
+        onPress={() => router.push('/(tabs)/recipes/new')}
       />
     </View>
   );
@@ -74,7 +77,7 @@ function RecipeCard({ recipe, onPress, onDelete }: { recipe: Recipe; onPress: ()
       <Card.Content>
         <View style={styles.cardHeader}>
           <Text variant="titleMedium" style={styles.cardTitle} numberOfLines={1}>{recipe.name}</Text>
-          <IconButton icon="delete-outline" size={18} onPress={onDelete} />
+          <IconButton icon="delete-outline" size={18} iconColor="#E74C3C" onPress={onDelete} />
         </View>
         <View style={styles.chips}>
           {recipe.difficulty && (
@@ -86,7 +89,7 @@ function RecipeCard({ recipe, onPress, onDelete }: { recipe: Recipe; onPress: ()
           <Chip compact style={styles.chip}>{recipe.servings} portion{recipe.servings > 1 ? 's' : ''}</Chip>
           {recipe.prepTimeMin && <Chip compact style={styles.chip}>{recipe.prepTimeMin} min</Chip>}
         </View>
-        <Text style={styles.ingCount}>{recipe.ingredients?.length ?? 0} ingrédients</Text>
+        <Text style={styles.ingCount}>{recipe.ingredients?.length ?? 0} ingrédient{(recipe.ingredients?.length ?? 0) > 1 ? 's' : ''}</Text>
       </Card.Content>
     </Card>
   );

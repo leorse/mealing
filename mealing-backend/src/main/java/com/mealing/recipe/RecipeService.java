@@ -57,9 +57,8 @@ public class RecipeService {
             }
         }
 
-        RecipeEntity saved = recipeRepository.save(recipe);
-        saved.setIsHealthy(calculateIsHealthy(computeNutrition(saved)));
-        return recipeRepository.save(saved);
+        recipe.setIsHealthy(calculateIsHealthy(computeNutrition(recipe)));
+        return recipeRepository.save(recipe);
     }
 
     @Transactional
@@ -87,9 +86,8 @@ public class RecipeService {
             }
         }
 
-        RecipeEntity saved = recipeRepository.save(recipe);
-        saved.setIsHealthy(calculateIsHealthy(computeNutrition(saved)));
-        return recipeRepository.save(saved);
+        recipe.setIsHealthy(calculateIsHealthy(computeNutrition(recipe)));
+        return recipeRepository.save(recipe);
     }
 
     @Transactional

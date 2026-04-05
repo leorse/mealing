@@ -7,7 +7,13 @@ import { usePlanStore } from '../../src/store/usePlanStore';
 export default function ShoppingScreen() {
   const [list, setList] = useState<ShoppingList | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { currentWeek } = usePlanStore();
+  const { currentWeek, fetchCurrentWeek } = usePlanStore();
+
+  useEffect(() => {
+    if (!currentWeek) {
+      fetchCurrentWeek();
+    }
+  }, []);
 
   useEffect(() => {
     if (currentWeek?.id) {

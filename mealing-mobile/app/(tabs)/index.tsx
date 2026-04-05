@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { Text, Card, ProgressBar, Chip, Button, ActivityIndicator } from 'react-native-paper';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useNutritionStore } from '../../src/store/useNutritionStore';
 import { usePlanStore } from '../../src/store/usePlanStore';
+
 export default function HomeScreen() {
   const router = useRouter();
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -15,10 +16,16 @@ export default function HomeScreen() {
   const log = dailyLogs[today];
 
   useEffect(() => {
-    fetchDailyLog(today);
     fetchObjectives();
     fetchCurrentWeek();
   }, []);
+
+  // Re-fetch le log du jour à chaque retour sur l'onglet (après ajout d'un slot par exemple)
+  useFocusEffect(
+    useCallback(() => {
+      fetchDailyLog(today);
+    }, [today])
+  );
 
   const targetCalories = objectives?.targetCalories ?? 2000;
   const consumed = log?.totalCalories ?? 0;
@@ -99,7 +106,7 @@ export default function HomeScreen() {
 
       {/* Accès rapides */}
       <View style={styles.quickAccess}>
-        <Button mode="outlined" icon="plus" onPress={() => router.push('/recipes/new')} style={styles.quickBtn}>
+        <Button mode="outlined" icon="plus" onPress={() => router.push('/(tabs)/recipes/new')} style={styles.quickBtn}>
           Nouvelle recette
         </Button>
         <Button mode="outlined" icon="alert" onPress={() => router.push('/deviation')} style={styles.quickBtn}>

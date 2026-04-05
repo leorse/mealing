@@ -10,10 +10,11 @@ import java.util.UUID;
 
 public interface IngredientRepository extends JpaRepository<IngredientEntity, UUID> {
 
-    @Query("SELECT i FROM IngredientEntity i WHERE " +
-           "LOWER(i.name) LIKE LOWER(CONCAT('%', :q, '%')) AND " +
-           "(i.isCustom = false OR i.userId = :userId) " +
-           "ORDER BY i.name")
+    @Query(value = "SELECT * FROM ingredients WHERE " +
+           "LOWER(name) LIKE LOWER('%' || :q || '%') AND " +
+           "(is_custom = 0 OR user_id = :#{#userId.toString()}) " +
+           "ORDER BY name LIMIT 50",
+           nativeQuery = true)
     List<IngredientEntity> searchByName(@Param("q") String q, @Param("userId") UUID userId);
 
     Optional<IngredientEntity> findByBarcode(String barcode);
