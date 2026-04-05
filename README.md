@@ -8,7 +8,7 @@ Application de **planification des repas et suivi nutritionnel**.
 - Gérer les écarts alimentaires (prévus ou imprévus)
 - Visualiser ses tendances via des graphiques
 - Exporter ses bilans nutritionnels en PDF
-- Rechercher des aliments via [Open Food Facts](https://world.openfoodfacts.org/)
+- Rechercher des aliments depuis un catalogue Open Food Facts local
 
 ---
 
@@ -18,7 +18,10 @@ Application de **planification des repas et suivi nutritionnel**.
 mealing/
 ├── mealing-backend/    API REST — Spring Boot 3.2 / Java 21
 ├── mealing-mobile/     Frontend — Expo React Native (web + Android)
-└── docker-compose.yml  PostgreSQL local (dev)
+├── cliqual/            Fichiers XML Ciqual 2025 (ANSES)
+└── tools/
+    ├── off-import/     Outil Java d'import du catalogue Open Food Facts → SQLite
+    └── ciqual-import/  Outil Java d'import Ciqual XML → PostgreSQL ingredients
 ```
 
 ---
@@ -69,6 +72,86 @@ npx expo start --web
 ```
 
 Ouvrir **http://localhost:8081** dans le navigateur.
+
+---
+
+## Catalogue Open Food Facts (import local)
+
+Le catalogue des aliments provient d'un fichier SQLite pré-construit à partir des données Open Food Facts.  
+Cet import est à faire **une seule fois** (ou à renouveler pour rafraîchir les données).
+
+### 1. Télécharger le fichier JSONL
+
+```
+https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz
+```
+
+Décompresser l'archive (le fichier fait ~11 Go compressé, ~60-80 Go décompressé) :
+
+```bash
+# Linux / macOS
+gunzip openfoodfacts-products.jsonl.gz
+
+# Windows (PowerShell)
+Expand-Archive openfoodfacts-products.jsonl.gz
+# ou avec 7-Zip
+```
+
+### 2. Compiler l'outil d'import
+
+```bash
+cd tools/off-import
+mvn package -q
+```
+
+### 3. Lancer l'import
+
+```bash
+# Syntaxe
+java -jar tools/off-import/target/off-import.jar <fichier.jsonl> [off_catalog.db]
+
+# Exemple — fichier décompressé dans le répertoire courant
+java -jar tools/off-import/target/off-import.jar openfoodfacts-products.jsonl
+
+# Exemple — chemin et sortie personnalisés
+java -jar tools/off-import/target/off-import.jar C:\Téléchargements\openfoodfacts-products.jsonl C:\prog\regime\off_catalog.db
+```
+
+L'import filtre automatiquement les produits sans nom ni valeur calorique.  
+La durée dépend du matériel (20-60 min typiquement).  
+Le fichier `off_catalog.db` produit est de **~300-600 Mo**.
+
+> Le fichier `off_catalog.db` doit ensuite être placé à la racine du projet pour que le backend puisse l'utiliser.
+
+---
+
+## Base Ciqual (aliments génériques)
+
+Les aliments génériques (pain, riz, poulet…) proviennent de la base Ciqual 2025 de l'ANSES.  
+Les fichiers XML sont inclus dans le répertoire `cliqual/`. L'import est à faire **une seule fois**.
+
+### 1. Compiler l'outil
+
+```bash
+cd tools/ciqual-import
+mvn package -q
+```
+
+### 2. Lancer l'import
+
+```bash
+# Syntaxe
+java -jar tools/ciqual-import/target/ciqual-import.jar <répertoire-cliqual> [jdbc-url] [user] [password]
+
+# Exemple avec les valeurs par défaut (localhost:5432, user mealing, pass mealing)
+java -jar tools/ciqual-import/target/ciqual-import.jar cliqual
+
+# Exemple avec connexion personnalisée
+java -jar tools/ciqual-import/target/ciqual-import.jar cliqual jdbc:postgresql://localhost:5432/mealing mealing mealing
+```
+
+L'outil insère ~2 800 aliments Ciqual dans la table `ingredients` avec `source = 'CIQUAL'`.  
+Il est idempotent (upsert par `off_id = CIQUAL_<code>`) — relancer ne crée pas de doublons.
 
 ---
 

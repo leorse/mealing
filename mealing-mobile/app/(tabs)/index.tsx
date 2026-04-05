@@ -6,14 +6,11 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useNutritionStore } from '../../src/store/useNutritionStore';
 import { usePlanStore } from '../../src/store/usePlanStore';
-import { useAuthStore } from '../../src/store/useAuthStore';
-
 export default function HomeScreen() {
   const router = useRouter();
   const today = format(new Date(), 'yyyy-MM-dd');
   const { dailyLogs, objectives, fetchDailyLog, fetchObjectives } = useNutritionStore();
   const { currentWeek, fetchCurrentWeek } = usePlanStore();
-  const { email } = useAuthStore();
 
   const log = dailyLogs[today];
 
@@ -40,7 +37,7 @@ export default function HomeScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text variant="headlineSmall" style={styles.greeting}>
-        Bonjour {email?.split('@')[0]} !
+        Bonjour !
       </Text>
       <Text variant="bodyMedium" style={styles.date}>
         {format(new Date(), 'EEEE d MMMM yyyy', { locale: fr })}

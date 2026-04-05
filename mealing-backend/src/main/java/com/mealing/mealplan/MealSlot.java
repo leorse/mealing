@@ -1,6 +1,7 @@
 package com.mealing.mealplan;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.mealing.preparedmeal.PreparedMeal;
 import com.mealing.recipe.RecipeEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -53,5 +54,18 @@ public class MealSlot {
     @Column(name = "consumed_at")
     private LocalDateTime consumedAt;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "prepared_meal_id")
+    private PreparedMeal preparedMeal;
+
+    @Builder.Default
+    @Column(name = "prepared_meal_portions", precision = 4, scale = 2)
+    private BigDecimal preparedMealPortions = BigDecimal.ONE;
+
+    @Builder.Default
+    @Column(name = "source_type")
+    private String sourceType = "RECIPE";
+
     public enum MealType { BREAKFAST, LUNCH, DINNER, SNACK }
+    public enum SourceType { RECIPE, PREPARED_MEAL, RESTAURANT, FREE }
 }

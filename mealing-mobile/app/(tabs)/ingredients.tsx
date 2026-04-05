@@ -103,8 +103,8 @@ export default function IngredientsTabScreen() {
         fabStyle={styles.fab}
         actions={[
           {
-            icon: 'earth',
-            label: 'Rechercher sur Open Food Facts',
+            icon: 'magnify',
+            label: 'Rechercher (Ciqual / OFF)',
             onPress: () => { setFabOpen(false); router.push('/ingredients/off-search' as any); },
           },
           {

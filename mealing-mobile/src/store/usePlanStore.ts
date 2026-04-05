@@ -11,7 +11,7 @@ interface PlanState {
 
   fetchWeek: (weekStart: string) => Promise<void>;
   fetchCurrentWeek: () => Promise<void>;
-  addSlot: (planId: string, slot: { slotDate: string; mealType: MealType; recipeId?: string; freeLabel?: string; portions?: number }) => Promise<void>;
+  addSlot: (planId: string, slot: { slotDate: string; mealType: MealType; recipeId?: string; preparedMealId?: string; freeLabel?: string; caloriesOverride?: number; portions?: number }) => Promise<void>;
   updateSlot: (slotId: string, slot: Partial<MealSlot> & { recipeId?: string }) => Promise<void>;
   deleteSlot: (slotId: string) => Promise<void>;
   markConsumed: (slotId: string) => Promise<void>;

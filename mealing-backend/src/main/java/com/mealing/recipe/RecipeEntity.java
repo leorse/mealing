@@ -43,6 +43,12 @@ public class RecipeEntity {
     @Column(name = "photo_url")
     private String photoUrl;
 
+    @Column(columnDefinition = "TEXT")
+    private String tags;
+
+    @Column(name = "nutrition_override", columnDefinition = "TEXT")
+    private String nutritionOverride;
+
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
     private List<RecipeIngredient> ingredients = new ArrayList<>();

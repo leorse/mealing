@@ -1,6 +1,6 @@
 package com.mealing.ingredient;
 
-import com.mealing.auth.JwtService;
+import com.mealing.config.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,24 +14,16 @@ import java.util.UUID;
 public class IngredientController {
 
     private final IngredientService ingredientService;
-    private final JwtService jwtService;
+    private final UserContext userContext;
 
     @GetMapping
-    public ResponseEntity<List<IngredientEntity>> search(
-        @RequestParam String q,
-        @RequestHeader("Authorization") String authHeader
-    ) {
-        UUID userId = extractUserId(authHeader);
-        return ResponseEntity.ok(ingredientService.search(q, userId));
+    public ResponseEntity<List<IngredientEntity>> search(@RequestParam String q) {
+        return ResponseEntity.ok(ingredientService.search(q, userContext.getUserId()));
     }
 
     @GetMapping("/barcode/{ean}")
-    public ResponseEntity<IngredientEntity> findByBarcode(
-        @PathVariable String ean,
-        @RequestHeader("Authorization") String authHeader
-    ) {
-        UUID userId = extractUserId(authHeader);
-        return ingredientService.findByBarcode(ean, userId)
+    public ResponseEntity<IngredientEntity> findByBarcode(@PathVariable String ean) {
+        return ingredientService.findByBarcode(ean, userContext.getUserId())
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }
@@ -42,51 +34,28 @@ public class IngredientController {
     }
 
     @PostMapping
-    public ResponseEntity<IngredientEntity> createCustom(
-        @RequestBody IngredientEntity ingredient,
-        @RequestHeader("Authorization") String authHeader
-    ) {
-        UUID userId = extractUserId(authHeader);
-        return ResponseEntity.ok(ingredientService.createCustom(ingredient, userId));
+    public ResponseEntity<IngredientEntity> createCustom(@RequestBody IngredientEntity ingredient) {
+        return ResponseEntity.ok(ingredientService.createCustom(ingredient, userContext.getUserId()));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<IngredientEntity> update(
-        @PathVariable UUID id,
-        @RequestBody IngredientEntity ingredient,
-        @RequestHeader("Authorization") String authHeader
-    ) {
-        UUID userId = extractUserId(authHeader);
-        return ResponseEntity.ok(ingredientService.update(id, ingredient, userId));
+    public ResponseEntity<IngredientEntity> update(@PathVariable UUID id, @RequestBody IngredientEntity ingredient) {
+        return ResponseEntity.ok(ingredientService.update(id, ingredient, userContext.getUserId()));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(
-        @PathVariable UUID id,
-        @RequestHeader("Authorization") String authHeader
-    ) {
-        UUID userId = extractUserId(authHeader);
-        ingredientService.delete(id, userId);
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        ingredientService.delete(id, userContext.getUserId());
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/import/off")
-    public ResponseEntity<List<IngredientEntity>> importFromOff(
-        @RequestParam String q,
-        @RequestHeader("Authorization") String auth
-    ) {
-        return ResponseEntity.ok(ingredientService.importFromOpenFoodFacts(q, extractUserId(auth)));
+    public ResponseEntity<List<IngredientEntity>> importFromOff(@RequestParam String q) {
+        return ResponseEntity.ok(ingredientService.importFromOpenFoodFacts(q, userContext.getUserId()));
     }
 
     @GetMapping("/import/barcode/{ean}")
-    public ResponseEntity<IngredientEntity> importByBarcode(
-        @PathVariable String ean,
-        @RequestHeader("Authorization") String auth
-    ) {
-        return ResponseEntity.ok(ingredientService.importByBarcode(ean, extractUserId(auth)));
-    }
-
-    private UUID extractUserId(String authHeader) {
-        return jwtService.extractUserId(authHeader.substring(7));
+    public ResponseEntity<IngredientEntity> importByBarcode(@PathVariable String ean) {
+        return ResponseEntity.ok(ingredientService.importByBarcode(ean, userContext.getUserId()));
     }
 }

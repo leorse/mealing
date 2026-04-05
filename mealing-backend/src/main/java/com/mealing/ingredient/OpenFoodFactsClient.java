@@ -5,11 +5,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -27,22 +31,22 @@ public class OpenFoodFactsClient {
         try {
             OFFSearchResponse response = openFoodFactsWebClient.get()
                 .uri(uriBuilder -> {
-                    var builder = uriBuilder
+                    var uri = uriBuilder
                         .path("/search")
                         .queryParam("search_terms", query)
                         .queryParam("fields", "code,product_name,product_name_fr,product_name_en,brands,nutriments,nutriscore_grade")
                         .queryParam("page_size", "25")
                         .queryParam("json", "1")
-                        .queryParam("lc", "fr");
-                    if (username != null && !username.isBlank()) {
-                        builder = builder
-                            .queryParam("user_id", username)
-                            .queryParam("password", password);
-                    }
-                    var uri = builder.build();
-                    log.info("[OFF] GET {}", uri);
+                        .queryParam("lc", "fr")
+                        .build();
+                    boolean hasUser = username != null && !username.isBlank();
+                    boolean hasPass = password != null && !password.isBlank();
+                    log.info("[OFF] GET {} | user={} pass={}", uri,
+                        hasUser ? username : "ABSENT",
+                        hasPass ? "SET" : "ABSENT/VIDE");
                     return uri;
                 })
+                .headers(h -> addBasicAuth(h, username, password))
                 .retrieve()
                 .onStatus(HttpStatusCode::is5xxServerError, resp ->
                     resp.bodyToMono(String.class).map(body ->
@@ -77,17 +81,9 @@ public class OpenFoodFactsClient {
 
     public Optional<IngredientEntity> findByBarcode(String ean, String username, String password) {
         try {
-            String url = "/product/" + ean + ".json";
             OFFProductWrapper response = openFoodFactsWebClient.get()
-                .uri(uriBuilder -> {
-                    var builder = uriBuilder.path(url);
-                    if (username != null && !username.isBlank()) {
-                        builder = builder
-                            .queryParam("user_id", username)
-                            .queryParam("password", password);
-                    }
-                    return builder.build();
-                })
+                .uri("/product/" + ean + ".json")
+                .headers(h -> addBasicAuth(h, username, password))
                 .retrieve()
                 .onStatus(HttpStatusCode::is5xxServerError, resp ->
                     resp.bodyToMono(String.class).map(body ->
@@ -109,6 +105,14 @@ public class OpenFoodFactsClient {
 
     public Optional<IngredientEntity> findByBarcode(String ean) {
         return findByBarcode(ean, null, null);
+    }
+
+    private void addBasicAuth(HttpHeaders headers, String username, String password) {
+        if (username != null && !username.isBlank() && password != null && !password.isBlank()) {
+            String credentials = username + ":" + password;
+            String encoded = Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+            headers.set(HttpHeaders.AUTHORIZATION, "Basic " + encoded);
+        }
     }
 
     private IngredientEntity mapToIngredient(OFFProduct p) {

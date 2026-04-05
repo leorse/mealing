@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { Text, Card, TextInput, Button, SegmentedButtons, ActivityIndicator, Divider } from 'react-native-paper';
 import { profileApi, UserProfile, Gender, ActivityLevel, Goal } from '../../src/api/profile';
-import { useAuthStore } from '../../src/store/useAuthStore';
-import { useRouter } from 'expo-router';
-
+import { offCatalogApi, CatalogStatus } from '../../src/api/offCatalog';
+import { ciqualApi, CiqualStatus } from '../../src/api/ciqual';
 const GENDERS: { value: Gender; label: string }[] = [
   { value: 'MALE', label: 'Homme' },
   { value: 'FEMALE', label: 'Femme' },
@@ -26,10 +25,10 @@ const GOALS: { value: Goal; label: string }[] = [
 ];
 
 export default function SettingsScreen() {
-  const router = useRouter();
-  const { logout, email } = useAuthStore();
   const [profile, setProfile] = useState<UserProfile>({});
   const [objectives, setObjectives] = useState<any>(null);
+  const [catalogStatus, setCatalogStatus] = useState<CatalogStatus | null>(null);
+  const [ciqualStatus, setCiqualStatus] = useState<CiqualStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -40,9 +39,16 @@ export default function SettingsScreen() {
 
   const loadData = async () => {
     try {
-      const [profileRes, objRes] = await Promise.all([profileApi.get(), profileApi.getObjectives()]);
+      const [profileRes, objRes, catalogRes, ciqualRes] = await Promise.all([
+        profileApi.get(),
+        profileApi.getObjectives(),
+        offCatalogApi.status().catch(() => null),
+        ciqualApi.status().catch(() => null),
+      ]);
       setProfile(profileRes.data);
       setObjectives(objRes.data);
+      if (catalogRes) setCatalogStatus(catalogRes.data);
+      if (ciqualRes) setCiqualStatus(ciqualRes.data);
     } catch {}
     setIsLoading(false);
   };
@@ -59,11 +65,6 @@ export default function SettingsScreen() {
     setIsSaving(false);
   };
 
-  const handleLogout = async () => {
-    await logout();
-    router.replace('/auth/login');
-  };
-
   if (isLoading) return <ActivityIndicator style={{ flex: 1, marginTop: 60 }} />;
 
   return (
@@ -72,8 +73,6 @@ export default function SettingsScreen() {
       <Card style={styles.card}>
         <Card.Content>
           <Text variant="titleMedium" style={styles.cardTitle}>Profil</Text>
-          <Text style={styles.emailLabel}>{email}</Text>
-
           <TextInput
             label="Prénom"
             value={profile.firstName ?? ''}
@@ -136,36 +135,74 @@ export default function SettingsScreen() {
         </Card.Content>
       </Card>
 
-      {/* Open Food Facts */}
+      {/* Catalogue Open Food Facts */}
       <Card style={styles.card}>
         <Card.Content>
-          <Text variant="titleMedium" style={styles.cardTitle}>Open Food Facts</Text>
-          <Text style={styles.offHint}>
-            Connectez votre compte Open Food Facts pour accéder à plus de produits et contribuer à la base de données.{'\n'}
-            Créer un compte gratuit sur <Text style={styles.offLink}>world.openfoodfacts.org</Text>
-          </Text>
-          <TextInput
-            label="Nom d'utilisateur OFF"
-            value={profile.offUsername ?? ''}
-            onChangeText={(v) => setProfile({ ...profile, offUsername: v })}
-            autoCapitalize="none"
-            mode="outlined"
-            style={styles.input}
-            left={<TextInput.Icon icon="account" />}
-          />
-          <TextInput
-            label="Mot de passe OFF"
-            value={profile.offPassword ?? ''}
-            onChangeText={(v) => setProfile({ ...profile, offPassword: v })}
-            secureTextEntry
-            mode="outlined"
-            style={styles.input}
-            left={<TextInput.Icon icon="lock" />}
-          />
-          {profile.offUsername ? (
-            <Text style={styles.offConnected}>Compte configuré : {profile.offUsername}</Text>
+          <Text variant="titleMedium" style={styles.cardTitle}>Catalogue Open Food Facts</Text>
+          {catalogStatus == null ? (
+            <ActivityIndicator size="small" style={{ alignSelf: 'flex-start', marginVertical: 4 }} />
+          ) : catalogStatus.available ? (
+            <>
+              <View style={styles.catalogRow}>
+                <Text style={styles.catalogIcon}>✅</Text>
+                <View>
+                  <Text style={styles.catalogPresent}>Catalogue présent</Text>
+                  <Text style={styles.catalogCount}>
+                    {catalogStatus.productCount.toLocaleString('fr-FR')} produits disponibles
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.catalogHint}>
+                La recherche d'ingrédients utilise le catalogue local OFF.
+              </Text>
+            </>
           ) : (
-            <Text style={styles.offDisconnected}>Aucun compte configuré — les recherches fonctionnent sans compte</Text>
+            <>
+              <View style={styles.catalogRow}>
+                <Text style={styles.catalogIcon}>⚠️</Text>
+                <View>
+                  <Text style={styles.catalogAbsent}>Catalogue absent</Text>
+                  <Text style={styles.catalogCount}>Aucune recherche OFF disponible</Text>
+                </View>
+              </View>
+              <Text style={styles.catalogHint}>
+                Pour activer la recherche, générez le fichier <Text style={{ fontWeight: 'bold' }}>off_catalog.db</Text> à la racine du projet (voir README).
+              </Text>
+            </>
+          )}
+        </Card.Content>
+      </Card>
+
+      {/* Base Ciqual */}
+      <Card style={styles.card}>
+        <Card.Content>
+          <Text variant="titleMedium" style={styles.cardTitle}>Base Ciqual (ANSES)</Text>
+          <Text style={styles.catalogHint}>
+            Base de données nutritionnelles française (~2 800 aliments génériques). Utilisée pour la recherche d'ingrédients non-marqués (pain, riz, poulet…).
+          </Text>
+          {ciqualStatus == null ? (
+            <ActivityIndicator size="small" style={{ alignSelf: 'flex-start', marginVertical: 8 }} />
+          ) : (
+            <View style={[styles.catalogRow, { marginTop: 10 }]}>
+              <Text style={styles.catalogIcon}>{ciqualStatus.count > 0 ? '✅' : '⚠️'}</Text>
+              <View style={{ flex: 1 }}>
+                {ciqualStatus.count > 0 ? (
+                  <>
+                    <Text style={styles.catalogPresent}>Base Ciqual disponible</Text>
+                    <Text style={styles.catalogCount}>
+                      {ciqualStatus.count.toLocaleString('fr-FR')} aliments génériques
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.catalogAbsent}>Base Ciqual non importée</Text>
+                    <Text style={styles.catalogCount}>
+                      Lancez <Text style={{ fontFamily: 'monospace', fontSize: 11 }}>ciqual-import.jar</Text> pour l'importer (voir README)
+                    </Text>
+                  </>
+                )}
+              </View>
+            </View>
           )}
         </Card.Content>
       </Card>
@@ -200,9 +237,6 @@ export default function SettingsScreen() {
         {saved ? 'Sauvegardé !' : 'Sauvegarder'}
       </Button>
 
-      <Button mode="outlined" onPress={handleLogout} style={styles.logoutBtn} textColor="#E74C3C">
-        Se déconnecter
-      </Button>
     </ScrollView>
   );
 }
@@ -222,16 +256,18 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 40 },
   card: { marginBottom: 16, borderRadius: 12 },
   cardTitle: { fontWeight: 'bold', marginBottom: 12, color: '#2C3E50' },
-  emailLabel: { color: '#666', marginBottom: 16 },
   input: { marginBottom: 12 },
   sectionLabel: { fontWeight: '500', marginTop: 8, marginBottom: 8, color: '#555' },
   segments: { marginBottom: 12 },
   activityBtn: { marginBottom: 8 },
   objRow: { flexDirection: 'row' },
   saveBtn: { marginBottom: 12 },
-  logoutBtn: { borderColor: '#E74C3C' },
-  offHint: { color: '#666', fontSize: 13, marginBottom: 12, lineHeight: 18 },
-  offLink: { color: '#2ECC71', fontWeight: 'bold' },
-  offConnected: { color: '#27AE60', fontSize: 13, marginTop: 4 },
-  offDisconnected: { color: '#999', fontSize: 12, marginTop: 4, fontStyle: 'italic' },
+  catalogRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  catalogIcon: { fontSize: 22 },
+  catalogPresent: { color: '#27AE60', fontWeight: '600', fontSize: 14 },
+  catalogAbsent: { color: '#E67E22', fontWeight: '600', fontSize: 14 },
+  catalogCount: { color: '#666', fontSize: 13, marginTop: 2 },
+  catalogHint: { color: '#888', fontSize: 12, lineHeight: 17, marginTop: 4 },
+  importError: { color: '#E74C3C', fontSize: 12, marginTop: 6 },
+  importSuccess: { color: '#27AE60', fontSize: 12, marginTop: 6 },
 });

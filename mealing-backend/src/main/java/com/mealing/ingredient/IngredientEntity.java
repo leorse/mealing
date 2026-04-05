@@ -52,7 +52,7 @@ public class IngredientEntity {
     @Column(name = "glycemic_index")
     private Integer glycemicIndex;
 
-    @Column(name = "nutri_score", columnDefinition = "CHAR(1)")
+    @Column(name = "nutri_score")
     private String nutriScore;
 
     @Column(name = "off_id")
@@ -61,6 +61,10 @@ public class IngredientEntity {
     @Builder.Default
     @Column(name = "is_custom")
     private Boolean isCustom = false;
+
+    /** MANUAL | CIQUAL | OFF */
+    @Column(name = "source")
+    private String source;
 
     @Column(name = "user_id")
     private UUID userId;

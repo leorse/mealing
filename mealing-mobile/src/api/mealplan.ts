@@ -14,6 +14,8 @@ export interface MealSlot {
   caloriesOverride?: number;
   isConsumed: boolean;
   consumedAt?: string;
+  preparedMealId?: string;
+  sourceType?: 'RECIPE' | 'PREPARED_MEAL' | 'RESTAURANT' | 'FREE';
 }
 
 export interface WeekPlan {

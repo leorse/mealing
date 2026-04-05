@@ -29,4 +29,8 @@ public class RecipeIngredient {
 
     @Column(name = "unit_label")
     private String unitLabel;
+
+    @Builder.Default
+    @Column(name = "is_resolved")
+    private Boolean isResolved = true;
 }

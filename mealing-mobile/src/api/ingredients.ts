@@ -44,3 +44,32 @@ export const ingredientsApi = {
   importByBarcode: (ean: string) =>
     api.get<Ingredient>(`/ingredients/import/barcode/${ean}`),
 };
+
+export const recipeImportApi = {
+  importFile: (file: File, overwrite = false) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('overwrite', String(overwrite));
+    return api.post<RecipeImportResponse>('/recipes/import', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+};
+
+export interface RecipeImportResponse {
+  status: 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED';
+  recipeId: string;
+  recipeName: string;
+  servings: number;
+  resolvedCount: number;
+  unresolvedIngredients: UnresolvedIngredient[];
+  warnings: string[];
+}
+
+export interface UnresolvedIngredient {
+  tempId: string;
+  name: string;
+  barcode?: string;
+  quantity?: string;
+  unit?: string;
+}

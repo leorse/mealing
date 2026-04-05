@@ -1,21 +1,19 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mealing}
-    username: ${DB_USER:mealing}
-    password: ${DB_PASSWORD:mealing}
-    driver-class-name: org.postgresql.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:sqlite:mealing.db}
+    driver-class-name: org.sqlite.JDBC
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
     show-sql: false
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        connection:
+          handling_mode: DELAYED_ACQUISITION_AND_RELEASE_AFTER_TRANSACTION
   flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
+    enabled: false
 
 mealing:
   jwt:
@@ -26,6 +24,10 @@ mealing:
   open-food-facts:
     base-url: https://world.openfoodfacts.org/api/v2
     timeout: 5000
+  off-catalog:
+    path: ${OFF_CATALOG_PATH:off_catalog.db}
+  ciqual:
+    csv-url: ${CIQUAL_CSV_URL:https://ciqual.anses.fr/cms/sites/default/files/inline-files/TableCIQUAL2020_FR_2020_07_07.csv}
 
 server:
   port: 8080

@@ -19,4 +19,10 @@ public interface IngredientRepository extends JpaRepository<IngredientEntity, UU
     Optional<IngredientEntity> findByBarcode(String barcode);
 
     List<IngredientEntity> findByUserIdOrIsCustomFalse(UUID userId);
+
+    List<IngredientEntity> findByNameIgnoreCase(String name);
+
+    Optional<IngredientEntity> findByOffId(String offId);
+
+    long countBySource(String source);
 }

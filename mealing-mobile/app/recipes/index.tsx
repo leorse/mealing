@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
-import { Text, Searchbar, Card, Chip, FAB, ActivityIndicator, IconButton } from 'react-native-paper';
+import { Text, Searchbar, Card, Chip, FAB, ActivityIndicator, IconButton, Tooltip } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useRecipeStore } from '../../src/store/useRecipeStore';
 import { Recipe } from '../../src/api/recipes';
@@ -52,7 +52,18 @@ export default function RecipesScreen() {
         />
       )}
 
-      <FAB icon="plus" style={styles.fab} onPress={() => router.push('/recipes/new')} label="Nouvelle recette" />
+      <FAB.Group
+        open={false}
+        visible
+        icon="plus"
+        color="white"
+        fabStyle={styles.fab}
+        actions={[
+          { icon: 'file-upload', label: 'Importer (JSON)', onPress: () => router.push('/recipes/import' as any) },
+          { icon: 'pencil-plus', label: 'Créer manuellement', onPress: () => router.push('/recipes/new') },
+        ]}
+        onStateChange={() => {}}
+      />
     </View>
   );
 }

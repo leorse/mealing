@@ -9,4 +9,5 @@ import java.util.UUID;
 public interface RecipeRepository extends JpaRepository<RecipeEntity, UUID> {
     List<RecipeEntity> findByUserId(UUID userId);
     Optional<RecipeEntity> findByIdAndUserId(UUID id, UUID userId);
+    Optional<RecipeEntity> findByUserIdAndNameIgnoreCase(UUID userId, String name);
 }
