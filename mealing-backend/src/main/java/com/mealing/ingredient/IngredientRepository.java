@@ -25,5 +25,9 @@ public interface IngredientRepository extends JpaRepository<IngredientEntity, UU
 
     Optional<IngredientEntity> findByOffId(String offId);
 
+    List<IngredientEntity> findByUserIdAndSource(UUID userId, String source);
+
+    void deleteByUserIdAndSource(UUID userId, String source);
+
     long countBySource(String source);
 }

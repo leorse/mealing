@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, Platform } from 'react-native';
 import { Text, Card, TextInput, Button, SegmentedButtons, ActivityIndicator, Divider } from 'react-native-paper';
 import { profileApi, UserProfile, Gender, ActivityLevel, Goal } from '../../src/api/profile';
 import { offCatalogApi, CatalogStatus } from '../../src/api/offCatalog';
 import { ciqualApi, CiqualStatus } from '../../src/api/ciqual';
+import { backupApi } from '../../src/api/backup';
 const GENDERS: { value: Gender; label: string }[] = [
   { value: 'MALE', label: 'Homme' },
   { value: 'FEMALE', label: 'Femme' },
@@ -32,6 +33,8 @@ export default function SettingsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -63,6 +66,57 @@ export default function SettingsScreen() {
       setTimeout(() => setSaved(false), 2000);
     } catch {}
     setIsSaving(false);
+  };
+
+  const handleExport = async () => {
+    if (Platform.OS !== 'web') {
+      setBackupStatus({ type: 'error', msg: 'Export disponible uniquement sur la version web pour l\'instant.' });
+      return;
+    }
+    try {
+      const res = await fetch(backupApi.exportUrl());
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const today = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `mealing-backup-${today}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setBackupStatus({ type: 'success', msg: 'Export téléchargé avec succès.' });
+    } catch (e: any) {
+      setBackupStatus({ type: 'error', msg: `Erreur export : ${e.message}` });
+    }
+  };
+
+  const handleImport = () => {
+    if (Platform.OS !== 'web') {
+      setBackupStatus({ type: 'error', msg: 'Import disponible uniquement sur la version web pour l\'instant.' });
+      return;
+    }
+    // Le file picker DOIT être déclenché synchronement dans le onPress (geste utilisateur direct)
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = async (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      // window.confirm est synchrone et accepté après sélection de fichier
+      if (!window.confirm('Cette action remplacera toutes vos données actuelles (recettes, planning, ingrédients créés…). Continuer ?')) return;
+      setIsImporting(true);
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        await backupApi.importData(data);
+        setBackupStatus({ type: 'success', msg: 'Import réussi ! Rechargez la page pour voir les données.' });
+      } catch (err: any) {
+        setBackupStatus({ type: 'error', msg: `Erreur import : ${err?.response?.data?.error ?? err.message}` });
+      } finally {
+        setIsImporting(false);
+      }
+    };
+    input.click();
   };
 
   if (isLoading) return <ActivityIndicator style={{ flex: 1, marginTop: 60 }} />;
@@ -227,6 +281,43 @@ export default function SettingsScreen() {
         </Card>
       )}
 
+      {/* Sauvegarde / Restauration */}
+      <Card style={styles.card}>
+        <Card.Content>
+          <Text variant="titleMedium" style={styles.cardTitle}>Sauvegarde & Restauration</Text>
+          <Text style={styles.catalogHint}>
+            Exporte vos données personnelles (recettes, planning, ingrédients créés, plats, etc.) dans un fichier JSON.
+            N'inclut pas les bases CIQUAL et Open Food Facts.
+          </Text>
+          <View style={styles.backupRow}>
+            <Button
+              mode="outlined"
+              icon="download"
+              onPress={handleExport}
+              style={{ flex: 1, marginRight: 8 }}
+              compact
+            >
+              Exporter
+            </Button>
+            <Button
+              mode="outlined"
+              icon="upload"
+              onPress={handleImport}
+              loading={isImporting}
+              style={{ flex: 1 }}
+              compact
+            >
+              Importer
+            </Button>
+          </View>
+          {backupStatus && (
+            <Text style={backupStatus.type === 'success' ? styles.importSuccess : styles.importError}>
+              {backupStatus.msg}
+            </Text>
+          )}
+        </Card.Content>
+      </Card>
+
       <Button
         mode="contained"
         onPress={handleSave}
@@ -262,6 +353,7 @@ const styles = StyleSheet.create({
   activityBtn: { marginBottom: 8 },
   objRow: { flexDirection: 'row' },
   saveBtn: { marginBottom: 12 },
+  backupRow: { flexDirection: 'row', marginTop: 12 },
   catalogRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   catalogIcon: { fontSize: 22 },
   catalogPresent: { color: '#27AE60', fontWeight: '600', fontSize: 14 },
