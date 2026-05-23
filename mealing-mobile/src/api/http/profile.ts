@@ -1,6 +1,4 @@
-import { Platform } from 'react-native';
 import api from './client';
-import { profileDbApi } from '../db/profileDb';
 
 export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 export type ActivityLevel = 'SEDENTARY' | 'LIGHT' | 'MODERATE' | 'ACTIVE' | 'VERY_ACTIVE';
@@ -31,10 +29,8 @@ export interface Objectives {
   targetFatG: number;
 }
 
-const httpApi = {
+export const profileApi = {
   get: () => api.get<UserProfile>('/profile'),
   update: (profile: UserProfile) => api.put<UserProfile>('/profile', profile),
   getObjectives: () => api.get<Objectives>('/profile/objectives'),
 };
-
-export const profileApi = Platform.OS === 'web' ? httpApi : profileDbApi;

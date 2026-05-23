@@ -1,6 +1,4 @@
-import { Platform } from 'react-native';
 import api from './client';
-import { preparedMealsDbApi } from '../db/preparedMealsDb';
 
 export interface PreparedMeal {
   id: string;
@@ -21,7 +19,7 @@ export interface PreparedMeal {
   createdAt?: string;
 }
 
-const httpApi = {
+export const preparedMealsApi = {
   getAll: () => api.get<PreparedMeal[]>('/prepared-meals'),
   getFavorites: () => api.get<PreparedMeal[]>('/prepared-meals/favorites'),
   getById: (id: string) => api.get<PreparedMeal>(`/prepared-meals/${id}`),
@@ -31,12 +29,3 @@ const httpApi = {
   toggleFavorite: (id: string) => api.put<PreparedMeal>(`/prepared-meals/${id}/favorite`),
   delete: (id: string) => api.delete(`/prepared-meals/${id}`),
 };
-
-export const preparedMealsApi = Platform.OS === 'web'
-  ? httpApi
-  : {
-      ...preparedMealsDbApi,
-      createFromBarcode: async (_ean: string) => {
-        throw new Error('Import par code-barre non disponible hors ligne');
-      },
-    };

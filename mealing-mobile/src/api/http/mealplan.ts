@@ -1,7 +1,5 @@
-import { Platform } from 'react-native';
 import api from './client';
-import { mealplanDbApi } from '../db/mealplanDb';
-import type { Recipe } from './recipes';
+import { Recipe } from './recipes';
 
 export type MealType = 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
 
@@ -27,17 +25,25 @@ export interface WeekPlan {
   slots: MealSlot[];
 }
 
-const httpApi = {
-  getWeek: (week: string) => api.get<WeekPlan>('/plans', { params: { week } }),
-  create: (weekStart: string) => api.post<WeekPlan>('/plans', { weekStart }),
+export const mealPlanApi = {
+  getWeek: (week: string) =>
+    api.get<WeekPlan>('/plans', { params: { week } }),
+
+  create: (weekStart: string) =>
+    api.post<WeekPlan>('/plans', { weekStart }),
+
   addSlot: (planId: string, slot: Partial<MealSlot> & { recipeId?: string }) =>
     api.post<MealSlot>(`/plans/${planId}/slots`, slot),
+
   updateSlot: (slotId: string, slot: Partial<MealSlot> & { recipeId?: string }) =>
     api.put<MealSlot>(`/plans/slots/${slotId}`, slot),
-  deleteSlot: (slotId: string) => api.delete(`/plans/slots/${slotId}`),
-  markConsumed: (slotId: string) => api.put<MealSlot>(`/plans/slots/${slotId}/consume`),
+
+  deleteSlot: (slotId: string) =>
+    api.delete(`/plans/slots/${slotId}`),
+
+  markConsumed: (slotId: string) =>
+    api.put<MealSlot>(`/plans/slots/${slotId}/consume`),
+
   copyWeek: (planId: string, targetWeekStart: string) =>
     api.post<WeekPlan>(`/plans/${planId}/copy`, { targetWeekStart }),
 };
-
-export const mealPlanApi = Platform.OS === 'web' ? httpApi : mealplanDbApi;

@@ -6,3 +6,7 @@ expo-env.d.ts
 # @end expo-cli
 target
 node_modules
+**/cliqual/*.xml
+_bmad
+_bmad-output
+.claude

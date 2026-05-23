@@ -5,6 +5,9 @@ import { profileApi, UserProfile, Gender, ActivityLevel, Goal } from '../../src/
 import { offCatalogApi, CatalogStatus } from '../../src/api/offCatalog';
 import { ciqualApi, CiqualStatus } from '../../src/api/ciqual';
 import { backupApi } from '../../src/api/backup';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 const GENDERS: { value: Gender; label: string }[] = [
   { value: 'MALE', label: 'Homme' },
   { value: 'FEMALE', label: 'Femme' },
@@ -69,54 +72,69 @@ export default function SettingsScreen() {
   };
 
   const handleExport = async () => {
-    if (Platform.OS !== 'web') {
-      setBackupStatus({ type: 'error', msg: 'Export disponible uniquement sur la version web pour l\'instant.' });
-      return;
-    }
     try {
-      const res = await fetch(backupApi.exportUrl());
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
       const today = new Date().toISOString().slice(0, 10);
-      a.href = url;
-      a.download = `mealing-backup-${today}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setBackupStatus({ type: 'success', msg: 'Export téléchargé avec succès.' });
+      const data = await backupApi.exportData();
+      const json = JSON.stringify(data, null, 2);
+
+      if (Platform.OS === 'web') {
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `mealing-backup-${today}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const path = FileSystem.documentDirectory + `mealing-backup-${today}.json`;
+        await FileSystem.writeAsStringAsync(path, json, { encoding: FileSystem.EncodingType.UTF8 });
+        await Sharing.shareAsync(path, { mimeType: 'application/json', dialogTitle: 'Sauvegarder le backup' });
+      }
+      setBackupStatus({ type: 'success', msg: 'Export réussi.' });
     } catch (e: any) {
       setBackupStatus({ type: 'error', msg: `Erreur export : ${e.message}` });
     }
   };
 
   const handleImport = () => {
-    if (Platform.OS !== 'web') {
-      setBackupStatus({ type: 'error', msg: 'Import disponible uniquement sur la version web pour l\'instant.' });
-      return;
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json,application/json';
+      input.onchange = async (e: Event) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+        if (!window.confirm('Cette action remplacera toutes vos données actuelles. Continuer ?')) return;
+        setIsImporting(true);
+        try {
+          const text = await file.text();
+          const data = JSON.parse(text);
+          await backupApi.importData(data);
+          setBackupStatus({ type: 'success', msg: 'Import réussi ! Rechargez la page pour voir les données.' });
+        } catch (err: any) {
+          setBackupStatus({ type: 'error', msg: `Erreur import : ${err?.response?.data?.error ?? err.message}` });
+        } finally {
+          setIsImporting(false);
+        }
+      };
+      input.click();
+    } else {
+      (async () => {
+        const result = await DocumentPicker.getDocumentAsync({ type: 'application/json' });
+        if (result.canceled || !result.assets?.[0]) return;
+        setIsImporting(true);
+        try {
+          const text = await FileSystem.readAsStringAsync(result.assets[0].uri);
+          const data = JSON.parse(text);
+          await backupApi.importData(data);
+          setBackupStatus({ type: 'success', msg: 'Import réussi !' });
+        } catch (err: any) {
+          setBackupStatus({ type: 'error', msg: `Erreur import : ${err.message}` });
+        } finally {
+          setIsImporting(false);
+        }
+      })();
     }
-    // Le file picker DOIT être déclenché synchronement dans le onPress (geste utilisateur direct)
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,application/json';
-    input.onchange = async (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      // window.confirm est synchrone et accepté après sélection de fichier
-      if (!window.confirm('Cette action remplacera toutes vos données actuelles (recettes, planning, ingrédients créés…). Continuer ?')) return;
-      setIsImporting(true);
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        await backupApi.importData(data);
-        setBackupStatus({ type: 'success', msg: 'Import réussi ! Rechargez la page pour voir les données.' });
-      } catch (err: any) {
-        setBackupStatus({ type: 'error', msg: `Erreur import : ${err?.response?.data?.error ?? err.message}` });
-      } finally {
-        setIsImporting(false);
-      }
-    };
-    input.click();
   };
 
   if (isLoading) return <ActivityIndicator style={{ flex: 1, marginTop: 60 }} />;

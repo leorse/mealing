@@ -1,6 +1,4 @@
-import { Platform } from 'react-native';
 import api from './client';
-import { restaurantMealsDbApi } from '../db/restaurantMealsDb';
 
 export interface DishTemplate {
   id: string;
@@ -48,7 +46,7 @@ export interface RestaurantIngredient {
   isEstimated: boolean;
 }
 
-const httpApi = {
+export const restaurantMealsApi = {
   getAll: () => api.get<RestaurantMeal[]>('/restaurant-meals'),
   getById: (id: string) => api.get<RestaurantMeal>(`/restaurant-meals/${id}`),
   create: (meal: Partial<RestaurantMeal>) => api.post<RestaurantMeal>('/restaurant-meals', meal),
@@ -61,12 +59,3 @@ const httpApi = {
   searchTemplates: (q?: string, category?: string) =>
     api.get<DishTemplate[]>('/dish-templates', { params: { q, category } }),
 };
-
-export const restaurantMealsApi = Platform.OS === 'web'
-  ? httpApi
-  : {
-      ...restaurantMealsDbApi,
-      addIngredient: async () => ({ data: null }),
-      removeIngredient: async () => ({ data: null }),
-      searchTemplates: async () => ({ data: [] as DishTemplate[] }),
-    };

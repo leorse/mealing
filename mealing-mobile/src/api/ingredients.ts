@@ -1,4 +1,6 @@
+import { Platform } from 'react-native';
 import api from './client';
+import { ingredientsDbApi } from '../db/ingredientsDb';
 
 export interface Ingredient {
   id: string;
@@ -19,42 +21,29 @@ export interface Ingredient {
   isCustom: boolean;
 }
 
-export const ingredientsApi = {
-  search: (q: string) =>
-    api.get<Ingredient[]>('/ingredients', { params: { q } }),
-
-  getById: (id: string) =>
-    api.get<Ingredient>(`/ingredients/${id}`),
-
-  findByBarcode: (ean: string) =>
-    api.get<Ingredient>(`/ingredients/barcode/${ean}`),
-
-  create: (ingredient: Partial<Ingredient>) =>
-    api.post<Ingredient>('/ingredients', ingredient),
-
-  update: (id: string, ingredient: Partial<Ingredient>) =>
-    api.put<Ingredient>(`/ingredients/${id}`, ingredient),
-
-  delete: (id: string) =>
-    api.delete(`/ingredients/${id}`),
-
-  searchOff: (q: string) =>
-    api.get<Ingredient[]>('/ingredients/import/off', { params: { q } }),
-
-  importByBarcode: (ean: string) =>
-    api.get<Ingredient>(`/ingredients/import/barcode/${ean}`),
+const httpApi = {
+  search: (q: string) => api.get<Ingredient[]>('/ingredients', { params: { q } }),
+  getById: (id: string) => api.get<Ingredient>(`/ingredients/${id}`),
+  findByBarcode: (ean: string) => api.get<Ingredient>(`/ingredients/barcode/${ean}`),
+  create: (ingredient: Partial<Ingredient>) => api.post<Ingredient>('/ingredients', ingredient),
+  update: (id: string, ingredient: Partial<Ingredient>) => api.put<Ingredient>(`/ingredients/${id}`, ingredient),
+  delete: (id: string) => api.delete(`/ingredients/${id}`),
+  searchOff: (q: string) => api.get<Ingredient[]>('/ingredients/import/off', { params: { q } }),
+  importByBarcode: (ean: string) => api.get<Ingredient>(`/ingredients/import/barcode/${ean}`),
 };
 
-export const recipeImportApi = {
-  importFile: (file: File, overwrite = false) => {
-    const form = new FormData();
-    form.append('file', file);
-    form.append('overwrite', String(overwrite));
-    return api.post<RecipeImportResponse>('/recipes/import', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
-};
+export const ingredientsApi = Platform.OS === 'web'
+  ? httpApi
+  : {
+      search: ingredientsDbApi.search,
+      getById: ingredientsDbApi.getById,
+      findByBarcode: ingredientsDbApi.findByBarcode,
+      create: ingredientsDbApi.create,
+      update: ingredientsDbApi.update,
+      delete: ingredientsDbApi.delete,
+      searchOff: async (_q: string) => ({ data: [] as Ingredient[] }),
+      importByBarcode: ingredientsDbApi.findByBarcode,
+    };
 
 export interface RecipeImportResponse {
   status: 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED';
@@ -73,3 +62,14 @@ export interface UnresolvedIngredient {
   quantity?: string;
   unit?: string;
 }
+
+export const recipeImportApi = {
+  importFile: (file: File, overwrite = false) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('overwrite', String(overwrite));
+    return api.post<RecipeImportResponse>('/recipes/import', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+};

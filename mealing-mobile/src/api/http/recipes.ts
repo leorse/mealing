@@ -1,7 +1,5 @@
-import { Platform } from 'react-native';
 import api from './client';
-import { recipesDbApi } from '../db/recipesDb';
-import type { Ingredient } from './ingredients';
+import { Ingredient } from './ingredients';
 
 export interface RecipeIngredient {
   id: string;
@@ -48,7 +46,7 @@ export interface RecipeRequest {
   ingredients?: { ingredientId: string; quantityG: number; unitLabel?: string }[];
 }
 
-const httpApi = {
+export const recipesApi = {
   getAll: () => api.get<Recipe[]>('/recipes'),
   getById: (id: string) => api.get<Recipe>(`/recipes/${id}`),
   create: (recipe: RecipeRequest) => api.post<Recipe>('/recipes', recipe),
@@ -56,5 +54,3 @@ const httpApi = {
   delete: (id: string) => api.delete(`/recipes/${id}`),
   getNutrition: (id: string) => api.get<NutritionResponse>(`/recipes/${id}/nutrition`),
 };
-
-export const recipesApi = Platform.OS === 'web' ? httpApi : recipesDbApi;
