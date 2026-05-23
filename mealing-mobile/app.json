@@ -4,11 +4,11 @@
     "slug": "mealing",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/meal-icon.png",
     "scheme": "mealing",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/meal-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#2ECC71"
     },
@@ -18,7 +18,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/meal-icon.png",
         "backgroundColor": "#2ECC71"
       },
       "package": "com.mealing.app"
@@ -26,7 +26,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/meal-icon.png"
     },
     "plugins": [
       "expo-router",
