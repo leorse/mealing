@@ -1,0 +1,52 @@
+import { db, type Ingredient } from '../schema';
+
+export async function search(query: string): Promise<Ingredient[]> {
+  const q = query.trim().toLowerCase();
+  if (!q) return db.ingredients.orderBy('name').limit(50).toArray();
+  return db.ingredients
+    .filter((i) => i.name.toLowerCase().includes(q) || (i.brand?.toLowerCase().includes(q) ?? false))
+    .limit(50)
+    .toArray();
+}
+
+export async function getByBarcode(ean: string): Promise<Ingredient | undefined> {
+  return db.ingredients.where('barcode').equals(ean).first();
+}
+
+export async function getById(id: string): Promise<Ingredient | undefined> {
+  return db.ingredients.get(id);
+}
+
+export async function create(data: Omit<Ingredient, 'id' | 'createdAt' | 'isCustom'>): Promise<Ingredient> {
+  const ingredient: Ingredient = {
+    ...data,
+    id: crypto.randomUUID(),
+    isCustom: true,
+    createdAt: new Date().toISOString(),
+  };
+  await db.ingredients.add(ingredient);
+  return ingredient;
+}
+
+export async function update(id: string, data: Partial<Ingredient>): Promise<void> {
+  await db.ingredients.update(id, data);
+}
+
+export async function remove(id: string): Promise<void> {
+  const ingredient = await db.ingredients.get(id);
+  if (ingredient && !ingredient.isCustom) {
+    throw new Error('Seuls les ingrédients personnalisés peuvent être supprimés');
+  }
+  await db.ingredients.delete(id);
+}
+
+export async function saveImported(data: Omit<Ingredient, 'id' | 'createdAt' | 'isCustom'>): Promise<Ingredient> {
+  const ingredient: Ingredient = {
+    ...data,
+    id: crypto.randomUUID(),
+    isCustom: false,
+    createdAt: new Date().toISOString(),
+  };
+  await db.ingredients.add(ingredient);
+  return ingredient;
+}

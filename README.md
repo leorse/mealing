@@ -10,85 +10,51 @@ Application de **planification des repas et suivi nutritionnel**.
 - Exporter ses bilans nutritionnels en PDF
 - Rechercher des aliments via [Open Food Facts](https://world.openfoodfacts.org/)
 
+**PWA local-first** : aucune donnée ne quitte l'appareil (stockage IndexedDB), pas de backend, pas de compte. Voir [spec.md](spec.md) pour le détail complet de l'architecture.
+
 ---
 
 ## Architecture
 
 ```
 mealing/
-├── mealing-backend/    API REST — Spring Boot 3.2 / Java 21
-├── mealing-mobile/     Frontend — Expo React Native (web + Android)
-└── docker-compose.yml  PostgreSQL local (dev)
+├── src/
+│   ├── app/         Bootstrap, routing, layout
+│   ├── screens/     Écrans de l'application
+│   ├── components/  Composants réutilisables
+│   ├── db/          Schéma Dexie (IndexedDB) + repositories
+│   ├── services/     Nutrition, Open Food Facts, export PDF, backup
+│   ├── store/        État UI (Zustand)
+│   └── hooks/        Hooks (dont lecture réactive Dexie)
+├── public/            Manifest PWA, icônes
+└── wrangler.toml       Déploiement Cloudflare Pages
 ```
 
 ---
 
 ## Prérequis
 
-| Outil | Version | Lien |
-|---|---|---|
-| Java | 21 LTS | https://adoptium.net/ |
-| Maven | 3.9+ | https://maven.apache.org/ |
-| Node.js | 20+ | https://nodejs.org/ |
-| PostgreSQL | 14+ | https://www.postgresql.org/ |
+| Outil | Version |
+|---|---|
+| Node.js | 20+ |
 
-> PostgreSQL doit tourner avec une base `mealing`, utilisateur `mealing`, mot de passe `mealing`.  
-> Flyway crée automatiquement les tables au premier démarrage du backend.
+Aucune base de données ni backend à installer.
 
 ---
 
 ## Lancement
 
-### Backend
-
 ```bash
-cd mealing-backend
-
-# Compiler
-mvn clean package -DskipTests
-
-# Lancer
-mvn spring-boot:run
+npm install
+npm run dev
 ```
 
-Le backend démarre sur **http://localhost:8080**  
-Swagger UI : http://localhost:8080/swagger-ui.html
+Ouvrir **http://localhost:5173**. Le premier lancement redirige automatiquement vers l'écran de création de profil.
 
-### Frontend
+## Build & déploiement
 
 ```bash
-cd mealing-mobile
-
-# Installer les dépendances (première fois)
-npm install --legacy-peer-deps
-
-# Lancer sur navigateur (test PC)
-npm run web
-# ou
-npx expo start --web
+npm run build
 ```
 
-Ouvrir **http://localhost:8081** dans le navigateur.
-
----
-
-## Variables d'environnement backend
-
-Les valeurs par défaut conviennent pour le développement local.
-
-| Variable | Défaut |
-|---|---|
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/mealing` |
-| `DB_USER` | `mealing` |
-| `DB_PASSWORD` | `mealing` |
-| `JWT_SECRET` | *(clé de dev embarquée — à changer en prod)* |
-
----
-
-## Premier lancement
-
-1. Démarrer PostgreSQL avec la base `mealing`
-2. Lancer le backend (`mvn spring-boot:run`)
-3. Lancer le frontend (`npm run web`)
-4. Ouvrir http://localhost:8081 → **S'inscrire**
-5. Remplir le profil (taille, poids, objectif calorique)
+Génère un site statique dans `dist/`, déployable sur **Cloudflare Pages** (build command `npm run build`, output directory `dist`).

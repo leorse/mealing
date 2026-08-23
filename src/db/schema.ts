@@ -1,0 +1,157 @@
+import Dexie, { type Table } from 'dexie';
+
+export interface UserProfile {
+  id?: number; // toujours 1 — profil unique local
+  firstName: string;
+  birthDate: string; // ISO date
+  gender: 'MALE' | 'FEMALE' | 'OTHER';
+  heightCm: number;
+  weightKg: number;
+  activityLevel: 'SEDENTARY' | 'LIGHT' | 'MODERATE' | 'ACTIVE' | 'VERY_ACTIVE';
+  goal: 'LOSE' | 'MAINTAIN' | 'GAIN';
+  targetCalories: number | null; // null = calculé automatiquement
+  macroProteinPct: number;
+  macroCarbsPct: number;
+  macroFatPct: number;
+  compensationSpread: number; // nb de jours pour compenser un écart
+  updatedAt: string;
+}
+
+export interface Ingredient {
+  id?: string; // uuid généré client
+  name: string;
+  brand?: string;
+  barcode?: string;
+  category: string;
+  calories100g: number;
+  proteins100g?: number;
+  carbs100g?: number;
+  sugars100g?: number;
+  fat100g?: number;
+  saturatedFat100g?: number;
+  fiber100g?: number;
+  salt100g?: number;
+  glycemicIndex?: number;
+  nutriScore?: 'A' | 'B' | 'C' | 'D' | 'E';
+  allergens?: string[];
+  offId?: string; // Open Food Facts ID
+  isCustom: boolean;
+  createdAt: string;
+}
+
+export interface Recipe {
+  id?: string;
+  name: string;
+  description?: string;
+  servings: number;
+  prepTimeMin?: number;
+  cookTimeMin?: number;
+  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
+  isHealthy?: boolean;
+  photoBlob?: Blob;
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecipeIngredient {
+  id?: string;
+  recipeId: string;
+  ingredientId: string;
+  quantityG: number;
+  unitLabel?: string;
+}
+
+export interface WeekPlan {
+  id?: string;
+  weekStart: string; // lundi de la semaine, ISO date
+  notes?: string;
+}
+
+export interface MealSlot {
+  id?: string;
+  weekPlanId: string;
+  slotDate: string;
+  mealType: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
+  recipeId?: string;
+  freeLabel?: string;
+  portions: number;
+  isDeviation: boolean;
+  caloriesOverride?: number;
+  isConsumed: boolean;
+  consumedAt?: string;
+}
+
+export interface DailyLog {
+  id?: string;
+  logDate: string;
+  totalCalories?: number;
+  totalProteins?: number;
+  totalCarbs?: number;
+  totalFat?: number;
+  totalFiber?: number;
+  weightKg?: number;
+  notes?: string;
+}
+
+export interface Deviation {
+  id?: string;
+  deviationDate: string;
+  mealSlotId?: string;
+  type: 'PLANNED' | 'UNPLANNED';
+  label: string;
+  caloriesExtra: number;
+  compensationSpread: number;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface ShoppingList {
+  id?: string;
+  weekPlanId?: string;
+  name?: string;
+  createdAt: string;
+}
+
+export interface ShoppingItem {
+  id?: string;
+  shoppingListId: string;
+  ingredientId?: string;
+  label: string;
+  quantityG?: number;
+  unitLabel?: string;
+  category?: string;
+  isChecked: boolean;
+  isManual: boolean;
+}
+
+class MealingDB extends Dexie {
+  userProfile!: Table<UserProfile, number>;
+  ingredients!: Table<Ingredient, string>;
+  recipes!: Table<Recipe, string>;
+  recipeIngredients!: Table<RecipeIngredient, string>;
+  weekPlans!: Table<WeekPlan, string>;
+  mealSlots!: Table<MealSlot, string>;
+  dailyLogs!: Table<DailyLog, string>;
+  deviations!: Table<Deviation, string>;
+  shoppingLists!: Table<ShoppingList, string>;
+  shoppingItems!: Table<ShoppingItem, string>;
+
+  constructor() {
+    super('mealing');
+    this.version(1).stores({
+      userProfile: '++id',
+      ingredients: 'id, name, barcode, category, isCustom',
+      recipes: 'id, name, difficulty, isHealthy',
+      recipeIngredients: 'id, recipeId, ingredientId',
+      weekPlans: 'id, weekStart',
+      mealSlots: 'id, weekPlanId, slotDate, [slotDate+mealType]',
+      dailyLogs: 'id, logDate',
+      deviations: 'id, deviationDate',
+      shoppingLists: 'id, weekPlanId',
+      shoppingItems: 'id, shoppingListId, category, isChecked',
+    });
+  }
+}
+
+export const db = new MealingDB();
