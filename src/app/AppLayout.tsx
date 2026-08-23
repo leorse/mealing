@@ -1,11 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom';
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Accueil' },
-  { to: '/planning', label: 'Planning' },
-  { to: '/shopping', label: 'Courses' },
-  { to: '/nutrition', label: 'Suivi' },
-  { to: '/settings', label: 'Réglages' },
+  { to: '/', icon: '/icons/nav/home.svg', label: 'Accueil' },
+  { to: '/planning', icon: '/icons/nav/planning.svg', label: 'Planning' },
+  { to: '/shopping', icon: '/icons/nav/caddie.svg', label: 'Courses' },
+  { to: '/nutrition', icon: '/icons/nav/suivi.svg', label: 'Suivi' },
+  { to: '/settings', icon: '/icons/nav/settings.svg', label: 'Réglages' },
 ];
 
 export default function AppLayout() {
@@ -16,8 +16,14 @@ export default function AppLayout() {
       </main>
       <nav className="bottom-nav">
         {NAV_ITEMS.map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => (isActive ? 'active' : '')}>
-            {item.label}
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.to === '/'}
+            className={({ isActive }) => (isActive ? 'active' : '')}
+            aria-label={item.label}
+          >
+            <img src={item.icon} alt="" className="nav-icon" />
           </NavLink>
         ))}
       </nav>

@@ -36,6 +36,7 @@ export interface Ingredient {
   allergens?: string[];
   offId?: string; // Open Food Facts ID
   isCustom: boolean;
+  source?: 'CIQUAL' | 'OFF' | 'CUSTOM'; // provenance de la donnée
   createdAt: string;
 }
 
@@ -125,6 +126,11 @@ export interface ShoppingItem {
   isManual: boolean;
 }
 
+export interface AppMeta {
+  key: string;
+  value: string;
+}
+
 class MealingDB extends Dexie {
   userProfile!: Table<UserProfile, number>;
   ingredients!: Table<Ingredient, string>;
@@ -136,6 +142,7 @@ class MealingDB extends Dexie {
   deviations!: Table<Deviation, string>;
   shoppingLists!: Table<ShoppingList, string>;
   shoppingItems!: Table<ShoppingItem, string>;
+  appMeta!: Table<AppMeta, string>;
 
   constructor() {
     super('mealing');
@@ -150,6 +157,7 @@ class MealingDB extends Dexie {
       deviations: 'id, deviationDate',
       shoppingLists: 'id, weekPlanId',
       shoppingItems: 'id, shoppingListId, category, isChecked',
+      appMeta: 'key',
     });
   }
 }

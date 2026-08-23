@@ -17,11 +17,12 @@ export async function getById(id: string): Promise<Ingredient | undefined> {
   return db.ingredients.get(id);
 }
 
-export async function create(data: Omit<Ingredient, 'id' | 'createdAt' | 'isCustom'>): Promise<Ingredient> {
+export async function create(data: Omit<Ingredient, 'id' | 'createdAt' | 'isCustom' | 'source'>): Promise<Ingredient> {
   const ingredient: Ingredient = {
     ...data,
     id: crypto.randomUUID(),
     isCustom: true,
+    source: 'CUSTOM',
     createdAt: new Date().toISOString(),
   };
   await db.ingredients.add(ingredient);
@@ -40,11 +41,12 @@ export async function remove(id: string): Promise<void> {
   await db.ingredients.delete(id);
 }
 
-export async function saveImported(data: Omit<Ingredient, 'id' | 'createdAt' | 'isCustom'>): Promise<Ingredient> {
+export async function saveImported(data: Omit<Ingredient, 'id' | 'createdAt' | 'isCustom' | 'source'>): Promise<Ingredient> {
   const ingredient: Ingredient = {
     ...data,
     id: crypto.randomUUID(),
     isCustom: false,
+    source: 'OFF',
     createdAt: new Date().toISOString(),
   };
   await db.ingredients.add(ingredient);

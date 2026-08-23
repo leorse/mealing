@@ -43,6 +43,24 @@ export function computeTargetCalories(
   return Math.round(tdee * (1 + GOAL_ADJUSTMENTS[profile.goal]));
 }
 
+export interface MacroTargets {
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
+/** Convertit la répartition macro en % en grammes cibles, à partir de l'objectif calorique. */
+export function computeMacroTargets(
+  targetCalories: number,
+  profile: Pick<UserProfile, 'macroProteinPct' | 'macroCarbsPct' | 'macroFatPct'>,
+): MacroTargets {
+  return {
+    proteinG: Math.round((targetCalories * (profile.macroProteinPct / 100)) / 4),
+    carbsG: Math.round((targetCalories * (profile.macroCarbsPct / 100)) / 4),
+    fatG: Math.round((targetCalories * (profile.macroFatPct / 100)) / 9),
+  };
+}
+
 export interface CompensationPlan {
   reductionPerDay: number;
   days: number;

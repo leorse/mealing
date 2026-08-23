@@ -4,7 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "seed:ciqual": "node scripts/convert-ciqual.mjs",
+    "predev": "npm run seed:ciqual",
     "dev": "vite",
+    "prebuild": "npm run seed:ciqual",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
