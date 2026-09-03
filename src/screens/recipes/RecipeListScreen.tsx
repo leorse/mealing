@@ -1,8 +1,69 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { list, remove } from '../../db/repositories/recipeRepository';
+import DifficultyIcon from '../../components/DifficultyIcon';
+import MaskIcon from '../../components/MaskIcon';
+import ConfirmModal from '../../components/ConfirmModal';
+
 export default function RecipeListScreen() {
+  const [query, setQuery] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const recipes = useLiveQuery(() => list(), []) ?? [];
+  const filtered = recipes.filter((r) => r.name.toLowerCase().includes(query.trim().toLowerCase()));
+
+  async function confirmDelete() {
+    if (!pendingDeleteId) return;
+    await remove(pendingDeleteId);
+    setPendingDeleteId(null);
+  }
+
   return (
     <div className="screen">
       <h1>Recettes</h1>
-      <p>À venir.</p>
+
+      <input
+        className="search-input"
+        placeholder="Rechercher une recette…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+
+      {filtered.length === 0 && <p className="empty-state">Aucune recette — créez-en une d'abord.</p>}
+
+      <ul className="recipe-list">
+        {filtered.map((recipe) => (
+          <li key={recipe.id} className="recipe-list-item">
+            <Link to={`/recipes/${recipe.id}`} className="recipe-list-link">
+              <span className="recipe-name">{recipe.name}</span>
+              <span className="recipe-meta">
+                {recipe.kind === 'PREPARED' ? (
+                  <span className="badge">🍱 Plat tout prêt</span>
+                ) : (
+                  <DifficultyIcon difficulty={recipe.difficulty ?? 'EASY'} />
+                )}
+                {recipe.isHealthy && <span className="badge badge--healthy">🌿 Healthy</span>}
+                <span>{recipe.servings} portion(s)</span>
+                {recipe.prepTimeMin != null && <span>{recipe.prepTimeMin} min</span>}
+              </span>
+            </Link>
+            <button type="button" className="icon-button" onClick={() => setPendingDeleteId(recipe.id!)} aria-label="Supprimer">
+              <MaskIcon src="/icons/common/trash.svg" color="#e74c3c" />
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <Link to="/recipes/new" className="fab" aria-label="Créer une recette">
+        +
+      </Link>
+
+      <ConfirmModal
+        open={pendingDeleteId !== null}
+        message="Supprimer cette recette ?"
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }

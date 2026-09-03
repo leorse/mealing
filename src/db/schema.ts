@@ -45,12 +45,18 @@ export interface Recipe {
   name: string;
   description?: string;
   servings: number;
+  kind: 'RECIPE' | 'PREPARED'; // RECIPE = calculée depuis les ingrédients, PREPARED = plat tout prêt (calories saisies directement)
   prepTimeMin?: number;
   cookTimeMin?: number;
-  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
+  difficulty?: 'EASY' | 'MEDIUM' | 'HARD'; // sans objet pour un plat tout prêt (kind: 'PREPARED')
   isHealthy?: boolean;
   photoBlob?: Blob;
   tags?: string[];
+  // Renseigné uniquement si kind === 'PREPARED' — valeurs nutritionnelles par portion, saisies à la main
+  caloriesPerServing?: number;
+  proteinsPerServing?: number;
+  carbsPerServing?: number;
+  fatPerServing?: number;
   createdAt: string;
   updatedAt: string;
 }

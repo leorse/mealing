@@ -35,6 +35,7 @@ export const router = createBrowserRouter([
           { path: '/recipes', element: <RecipeListScreen /> },
           { path: '/recipes/new', element: <RecipeFormScreen /> },
           { path: '/recipes/:id', element: <RecipeDetailScreen /> },
+          { path: '/recipes/:id/edit', element: <RecipeFormScreen /> },
           { path: '/ingredients', element: <IngredientSearchScreen /> },
           { path: '/ingredients/scan', element: <BarcodeScanScreen /> },
           { path: '/ingredients/:id', element: <IngredientDetailScreen /> },

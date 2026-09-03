@@ -64,7 +64,11 @@ La v1 (Spring Boot + PostgreSQL + React Native) reposait sur un backend central 
 
 ## 2. Périmètre fonctionnel
 
-*(Fonctionnellement identique à la v1 — seule la couche technique change. Le détail ci-dessous est repris à l'identique, les tables/entités citées correspondent maintenant à des stores IndexedDB, voir §5.)*
+*(Reprend et complète le périmètre de la v1 avec les fonctionnalités détaillées dans `assets/SPEC-FONCTIONNELLE.md`
+— extras de créneau, plats préparés, assistant repas restaurant, import de recettes. Les éléments propres à
+l'ancienne architecture Android/SQLite de ce document — authentification, base Ciqual externe, catalogue OFF
+hors-ligne dédié — sont adaptés ou abandonnés au profit du modèle 100% local-first, voir §2.12 et §11.1. Les
+tables/entités citées correspondent à des stores IndexedDB, voir §5.)*
 
 ### 2.1 Gestion du profil utilisateur
 
@@ -104,11 +108,18 @@ La v1 (Spring Boot + PostgreSQL + React Native) reposait sur un backend central 
 
 - Vue calendrier de la semaine en cours (lundi → dimanche)
 - 4 créneaux par jour : Petit-déjeuner, Déjeuner, Dîner, Collation
-- Ajout d'un repas : sélection d'une recette existante ou saisie libre
+- Ajout d'un repas : trois sources possibles — **recette** existante (choix du nb de portions), **plat préparé**
+  (§2.9, choix du nb de portions), ou **saisie libre** (libellé + calories à la main)
+- Messages d'état vide explicites si les bases sont vides ("Aucune recette — créez-en une d'abord", "Aucun plat
+  préparé — ajoutez-en depuis l'onglet Plats préparés")
 - Affichage du total calorique du jour en temps réel
 - Indicateur visuel par jour : vert (dans l'objectif ±10%), orange (léger écart), rouge (dépassement)
+- Par créneau planifié : nom, nombre de portions, calories, actions **marquer consommé**, **supprimer**, **ouvrir
+  le détail** (extras, §2.8)
 - Navigation entre les semaines (historique + planification future)
 - Copier/coller une semaine vers une autre semaine
+- Création implicite du plan de semaine au premier ajout de repas
+- La persistance du repas consommé alimente le journal nutritionnel (§2.7)
 
 ### 2.5 Liste de courses
 
@@ -130,17 +141,94 @@ La v1 (Spring Boot + PostgreSQL + React Native) reposait sur un backend central 
 
 #### Écart imprévu (saisie a posteriori)
 - Saisie d'un repas non planifié après consommation
-- Choix rapide parmi des repas types (pizza, burger, kebab, dessert riche…) avec kcal estimées
+- Choix rapide parmi des repas types pré-remplis : Pizza (700 kcal) · Burger (650) · Kebab (800) ·
+  Dessert (400) · Apéritif (350) · Restaurant complet (900)
 - Ou saisie libre en kcal
 - Calcul du surplus sur la journée
-- Affichage de la dette calorique et suggestions de compensation sur J+1 / J+2
+- Affichage de la dette calorique et suggestions de compensation sur J+1 / J+2, avec **aperçu de compensation**
+  ("Réduction de X kcal/jour pendant N jours")
 - Historique des écarts avec type et surplus
+- Déclenchement possible directement depuis le détail d'un créneau en dépassement (§2.8) ou d'un repas
+  restaurant (§2.10), avec pré-remplissage des champs
 
 ### 2.7 Journalisation alimentaire
 
 - Validation quotidienne des repas (repas planifié → consommé ou modifié)
 - Différence planning vs. réel tracée
 - Saisie du poids du jour (optionnel) pour suivre l'évolution
+
+### 2.8 Extras de créneau repas
+
+Chaque créneau planifié (§2.4) peut recevoir des **à-côtés** en plus du plat principal, gérés depuis un écran
+détail de créneau :
+
+- Types d'extra : 🥗 Entrée · 🥔 Accompagnement · 🍮 Dessert · 🥤 Boisson · 🍪 En-cas · ➕ Autre
+- Trois modes d'ajout d'un extra :
+  - **Ingrédient** : recherche dans la base (§2.2) + quantité en grammes
+  - **Plat préparé** : sélection dans la bibliothèque (§2.9) + nombre de portions
+  - **Libre** : libellé + calories + macros saisies à la main
+- Liste des extras du créneau avec suppression rapide ; message "Aucun extra pour ce repas" si vide
+- **Total du créneau** (plat principal × portions + somme des extras) comparé à l'objectif du créneau
+- **Détection de dépassement** : au-delà de 115 % de l'objectif du créneau, le total s'affiche en rouge avec un
+  bouton **"Déclarer comme écart"** qui bascule vers l'écran d'écart (§2.6) pré-rempli avec le surplus calculé
+
+### 2.9 Plats préparés
+
+Bibliothèque de plats tout prêts (surgelés, conserves, plats du commerce) pour la saisie rapide, distincte des
+recettes maison (pas d'ingrédients détaillés, juste des valeurs nutritionnelles par portion) :
+
+- Fiche : nom, marque, nombre de portions, valeurs nutritionnelles **par portion**, Nutri-Score, mise en favori
+- Création manuelle ou **par code-barres** (scan EAN → import Open Food Facts → remplissage automatique)
+- Message d'état vide : "Aucun plat préparé — utilisez le + pour en ajouter"
+- Utilisable à deux endroits : comme repas planifié dans un créneau (§2.4), et comme extra de créneau (§2.8)
+
+### 2.10 Repas restaurant — assistant guidé
+
+Saisie rapide d'un repas pris au restaurant, hors planning habituel, via un assistant en **4 étapes** avec
+indicateur de progression et retour arrière possible :
+
+1. **Le restaurant** — nom (optionnel), nom du plat (**obligatoire**), notes libres (accompagnements, sauce…),
+   type de cuisine : 🇫🇷 Français · 🇮🇹 Italien · 🇯🇵 Japonais · 🇨🇳 Chinois · 🇹🇭 Thaï · 🇮🇳 Indien ·
+   🇲🇦 Marocain · 🇺🇸 Américain · 🌍 Autre
+2. **Méthode d'estimation** — au choix :
+   - ✏️ **Saisie directe** : calories (+ macros) approximatives
+   - 📋 **Plat type** : choix dans une bibliothèque d'environ 80 plats courants pré-estimés
+   - 🔍 **Reconstitution** : ajout des ingrédients un par un, pour une estimation plus précise
+3. **Détails** — selon la méthode choisie : macros libres, ou taille de portion (Petite/Normale/Grande)
+   appliquée au plat type, ou liste des ingrédients reconstitués (ajout/suppression)
+4. **Résumé** — récapitulatif et calories estimées avant enregistrement
+
+Le repas restaurant enregistré alimente le journal du jour comme un repas consommé, avec ses propres valeurs
+nutritionnelles estimées (et, en méthode reconstitution, le détail des ingrédients), et peut être marqué comme
+écart (§2.6).
+
+### 2.11 Import de recettes (JSON)
+
+- Import d'un fichier JSON décrivant une ou plusieurs recettes (nom, portions, ingrédients, quantités, unités,
+  `nutritionOverride` optionnel)
+- Résolution automatique des ingrédients par nom sur la base locale
+- Retour d'import : `SUCCESS` / `PARTIAL_SUCCESS` / `FAILED`, nombre d'ingrédients résolus, liste des non
+  résolus, avertissements éventuels
+- **Écran de résolution** pour les ingrédients non résolus : associer manuellement à un ingrédient existant,
+  en créer un nouveau, ou ignorer la ligne — avec retour à la recette en cours d'import une fois résolu
+
+### 2.12 Base d'aliments génériques (seed embarqué)
+
+En l'absence de backend, l'équivalent d'une base nutritionnelle générique externe (type Ciqual/ANSES) est un
+**jeu de données JSON statique bundlé avec l'application**, chargé dans IndexedDB au premier lancement. Il
+complète Open Food Facts (produits de marque, code-barres, §2.2) et les ingrédients personnalisés, sans
+dépendance à un service externe.
+
+**Implémentation** :
+
+- `assets/ciqual.sql` (dump SQL source, ~3 300 aliments génériques Ciqual) → converti en `public/seed/ciqual.json`
+  par `scripts/convert-ciqual.mjs` (exécuté automatiquement via `predev`/`prebuild`, ou manuellement via
+  `npm run seed:ciqual` après mise à jour du fichier source)
+- `src/db/seed.ts` → `ensureCiqualSeed()`, appelé une fois au démarrage (`main.tsx`) : si non déjà fait (flag
+  dans le store `appMeta`), fetch `/seed/ciqual.json` et `bulkPut` dans `db.ingredients`
+- Chaque ingrédient est marqué `source: 'CIQUAL'` (vs `'OFF'` pour un import Open Food Facts, `'CUSTOM'` pour
+  une saisie manuelle) — ce champ permet de distinguer l'origine des données dans l'UI si besoin (ex. bascule
+  Générique / Marque façon ancien `off-search`)
 
 ---
 
@@ -205,17 +293,30 @@ screens/
 ├── planning/
 │   ├── WeekPlanScreen.tsx        # vue calendrier semaine
 │   ├── DayDetailScreen.tsx       # détail d'un jour
-│   └── AddMealScreen.tsx         # ajout d'un repas à un créneau
+│   ├── AddMealScreen.tsx         # ajout d'un repas à un créneau (recette / plat préparé / libre)
+│   └── MealSlotDetailScreen.tsx  # détail créneau : plat principal + extras + total vs objectif
 │
 ├── recipes/
 │   ├── RecipeListScreen.tsx
 │   ├── RecipeDetailScreen.tsx
-│   └── RecipeFormScreen.tsx      # création / édition
+│   ├── RecipeFormScreen.tsx      # création / édition
+│   ├── RecipeImportScreen.tsx    # import JSON
+│   └── RecipeImportResolveScreen.tsx  # résolution des ingrédients non résolus
 │
 ├── ingredients/
-│   ├── IngredientSearchScreen.tsx
+│   ├── IngredientSearchScreen.tsx    # recherche unifiée : base locale + Open Food Facts
 │   ├── IngredientDetailScreen.tsx
+│   ├── IngredientFormScreen.tsx      # création manuelle
 │   └── BarcodeScanScreen.tsx     # BarcodeDetector API / ZXing
+│
+├── preparedMeals/
+│   ├── PreparedMealListScreen.tsx
+│   ├── PreparedMealDetailScreen.tsx
+│   └── PreparedMealFormScreen.tsx    # création / édition (+ import par code-barres)
+│
+├── restaurantMeals/
+│   ├── RestaurantMealWizardScreen.tsx  # assistant 4 étapes
+│   └── RestaurantMealDetailScreen.tsx
 │
 ├── shopping/
 │   └── ShoppingListScreen.tsx
@@ -239,21 +340,33 @@ screens/
 
 ```
 AppRouter
-├── "/"                    → HomeScreen
-├── "/onboarding"          → ProfileSetupScreen (redirection si aucun profil local)
-├── "/planning"            → WeekPlanScreen
-├── "/planning/:date"      → DayDetailScreen
-├── "/recipes"             → RecipeListScreen
-├── "/recipes/:id"         → RecipeDetailScreen
-├── "/ingredients"         → IngredientSearchScreen
-├── "/ingredients/scan"    → BarcodeScanScreen
-├── "/shopping"            → ShoppingListScreen
-├── "/nutrition"           → DashboardScreen
-├── "/analytics"           → AnalyticsScreen
-├── "/export"              → ExportScreen
-└── "/settings"            → SettingsScreen
+├── "/"                          → HomeScreen
+├── "/onboarding"                → ProfileSetupScreen (redirection si aucun profil local)
+├── "/planning"                  → WeekPlanScreen
+├── "/planning/:date"            → DayDetailScreen
+├── "/planning/:date/add"        → AddMealScreen
+├── "/meal-slots/:id"            → MealSlotDetailScreen
+├── "/recipes"                   → RecipeListScreen
+├── "/recipes/:id"               → RecipeDetailScreen
+├── "/recipes/import"            → RecipeImportScreen
+├── "/ingredients"                → IngredientSearchScreen
+├── "/ingredients/scan"           → BarcodeScanScreen
+├── "/ingredients/:id"            → IngredientDetailScreen
+├── "/prepared-meals"             → PreparedMealListScreen
+├── "/prepared-meals/:id"         → PreparedMealDetailScreen
+├── "/restaurant-meals/new"       → RestaurantMealWizardScreen
+├── "/restaurant-meals/:id"       → RestaurantMealDetailScreen
+├── "/shopping"                  → ShoppingListScreen
+├── "/nutrition"                 → DashboardScreen
+├── "/nutrition/deviation"       → DeviationScreen
+├── "/analytics"                 → AnalyticsScreen
+├── "/export"                    → ExportScreen
+└── "/settings"                  → SettingsScreen
 
-BottomNav (mobile) : Accueil · Planning · Courses · Suivi · Paramètres
+BottomNav (icônes seules, pas de libellé, SVG dans public/icons/nav/) :
+home.svg (Accueil) · planning.svg (Planning) · caddie.svg (Courses) · suivi.svg (Suivi) · settings.svg (Paramètres)
+Accès aux modules secondaires (Recettes, Ingrédients, Plats préparés, Repas restaurant) depuis les écrans
+associés plutôt que la barre principale, pour ne pas surcharger la navigation basse.
 ```
 
 ### 4.3 State management
@@ -351,6 +464,7 @@ export interface Ingredient {
   allergens?: string[];
   offId?: string;               // Open Food Facts ID
   isCustom: boolean;
+  source?: 'CIQUAL' | 'OFF' | 'CUSTOM'; // provenance de la donnée
   createdAt: string;
 }
 
@@ -388,8 +502,10 @@ export interface MealSlot {
   weekPlanId: string;
   slotDate: string;
   mealType: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
-  recipeId?: string;
-  freeLabel?: string;
+  recipeId?: string;          // source "recette"
+  preparedMealId?: string;    // source "plat préparé"
+  freeLabel?: string;         // source "saisie libre"
+  restaurantMealId?: string;  // repas restaurant rattaché (§2.10)
   portions: number;
   isDeviation: boolean;
   caloriesOverride?: number;
@@ -440,6 +556,70 @@ export interface ShoppingItem {
   isManual: boolean;
 }
 
+export interface PreparedMeal {
+  id?: string;
+  name: string;
+  brand?: string;
+  servings: number;
+  caloriesPerServing: number;
+  proteinsPerServing?: number;
+  carbsPerServing?: number;
+  fatPerServing?: number;
+  fiberPerServing?: number;
+  nutriScore?: 'A' | 'B' | 'C' | 'D' | 'E';
+  barcode?: string;
+  isFavorite: boolean;
+  createdAt: string;
+}
+
+export type ExtraType = 'STARTER' | 'SIDE' | 'DESSERT' | 'DRINK' | 'SNACK' | 'OTHER';
+
+export interface MealSlotExtra {
+  id?: string;
+  mealSlotId: string;
+  type: ExtraType;
+  label: string;
+  ingredientId?: string;      // mode "ingrédient"
+  quantityG?: number;
+  preparedMealId?: string;    // mode "plat préparé"
+  portions?: number;
+  calories: number;           // toujours renseigné, quel que soit le mode (calculé ou saisi)
+  proteins?: number;
+  carbs?: number;
+  fat?: number;
+}
+
+export type EstimationMethod = 'DIRECT' | 'MEAL_TYPE' | 'RECONSTRUCTED';
+
+export interface RestaurantMeal {
+  id?: string;
+  date: string;
+  restaurantName?: string;
+  dishName: string;
+  notes?: string;
+  cuisineType?: string;
+  estimationMethod: EstimationMethod;
+  portionSize?: 'SMALL' | 'NORMAL' | 'LARGE'; // méthode MEAL_TYPE
+  mealTypeRef?: string;                        // référence dans la bibliothèque des ~80 plats types
+  calories: number;
+  proteins?: number;
+  carbs?: number;
+  fat?: number;
+  createdAt: string;
+}
+
+export interface RestaurantMealIngredient {
+  id?: string;
+  restaurantMealId: string;
+  ingredientId: string;
+  quantityG: number;
+}
+
+export interface AppMeta {
+  key: string;   // ex. "ciqualSeededAt"
+  value: string;
+}
+
 class MealingDB extends Dexie {
   userProfile!: Table<UserProfile, number>;
   ingredients!: Table<Ingredient, string>;
@@ -447,10 +627,14 @@ class MealingDB extends Dexie {
   recipeIngredients!: Table<RecipeIngredient, string>;
   weekPlans!: Table<WeekPlan, string>;
   mealSlots!: Table<MealSlot, string>;
+  mealSlotExtras!: Table<MealSlotExtra, string>;
   dailyLogs!: Table<DailyLog, string>;
   deviations!: Table<Deviation, string>;
   shoppingLists!: Table<ShoppingList, string>;
   shoppingItems!: Table<ShoppingItem, string>;
+  preparedMeals!: Table<PreparedMeal, string>;
+  restaurantMeals!: Table<RestaurantMeal, string>;
+  restaurantMealIngredients!: Table<RestaurantMealIngredient, string>;
 
   constructor() {
     super('mealing');
@@ -461,10 +645,14 @@ class MealingDB extends Dexie {
       recipeIngredients: 'id, recipeId, ingredientId',
       weekPlans: 'id, weekStart',
       mealSlots: 'id, weekPlanId, slotDate, [slotDate+mealType]',
+      mealSlotExtras: 'id, mealSlotId, type',
       dailyLogs: 'id, logDate',
       deviations: 'id, deviationDate',
       shoppingLists: 'id, weekPlanId',
       shoppingItems: 'id, shoppingListId, category, isChecked',
+      preparedMeals: 'id, name, barcode, isFavorite',
+      restaurantMeals: 'id, date',
+      restaurantMealIngredients: 'id, restaurantMealId, ingredientId',
     });
   }
 }
@@ -540,8 +728,43 @@ Chaque module expose un repository TypeScript qui encapsule les requêtes Dexie 
 |---|---|
 | `getDaily(date)` | Données graphiques journalières |
 | `getWeekly(week)` | Données graphiques hebdomadaires |
-| `getMonthly(month)` | Données graphiques mensuelles |
+| `getMonthly(month)` | Données graphiques mensuelles (affichées seulement au-delà de 30 jours d'historique) |
 | `getTrends(period)` | Tendances poids + calories |
+
+### 6.7 Repository Extras de créneau
+
+| Fonction | Description |
+|---|---|
+| `listForSlot(mealSlotId)` | Extras d'un créneau |
+| `addExtra(mealSlotId, data)` | Ajouter un extra (ingrédient / plat préparé / libre — calories calculées selon le mode) |
+| `removeExtra(extraId)` | Supprimer |
+| `getSlotTotal(mealSlotId)` | Total calorique du créneau (plat principal × portions + Σ extras), voir §8.7 |
+
+### 6.8 Repository Plats préparés
+
+| Fonction | Description |
+|---|---|
+| `list()` / `getById(id)` | Liste / détail |
+| `create(data)` / `update(id, data)` / `delete(id)` | CRUD |
+| `toggleFavorite(id)` | Mise en favori |
+| `importFromOFFBarcode(ean)` | Création automatique depuis un scan EAN |
+
+### 6.9 Repository Repas restaurant
+
+| Fonction | Description |
+|---|---|
+| `create(data)` | Enregistrer un repas restaurant (quelle que soit la méthode d'estimation) |
+| `getById(id)` / `list()` | Détail / historique |
+| `addReconstructedIngredient(restaurantMealId, ingredientId, quantityG)` | Méthode reconstitution |
+| `searchMealTypeLibrary(query)` | Recherche dans la bibliothèque des ~80 plats types (seed statique, cf. §2.12) |
+
+### 6.10 Repository Import de recettes
+
+| Fonction | Description |
+|---|---|
+| `parseJson(file)` | Parse et valide la structure du fichier |
+| `resolveIngredients(parsedRecipes)` | Tente la résolution par nom sur la base locale, retourne les non résolus |
+| `commitImport(resolvedRecipes)` | Crée effectivement les recettes + `recipeIngredients`, retourne le rapport `SUCCESS`/`PARTIAL_SUCCESS`/`FAILED` |
 
 Toutes ces fonctions sont **synchrones/asynchrones locales** (Dexie retourne des `Promise`), sans transport HTTP, sans auth, sans gestion d'erreurs réseau — uniquement des erreurs de transaction IndexedDB (rares).
 
@@ -671,6 +894,23 @@ Pour chaque jour J+1 à J+n :
 ```
 
 Ces fonctions vivent dans `services/nutrition.ts`, pures et testables unitairement (aucune dépendance IO).
+
+### 8.7 Total et dépassement d'un créneau
+
+```
+total_creneau = (calories_plat_principal × portions) + Σ calories_extras
+
+Si total_creneau > objectif_creneau × 1.15 :
+  afficher le total en rouge + proposer "Déclarer comme écart" (§2.6, §2.8)
+```
+
+L'objectif d'un créneau est calculé en répartissant l'objectif calorique journalier sur les 4 créneaux selon une
+pondération configurable (par défaut équirépartie, ajustable en Phase ultérieure).
+
+### 8.8 Objectif fibres
+
+Objectif journalier fixe de **25 g de fibres**, affiché aux côtés des macros dans le tableau de bord (§9.1) et
+la vue Suivi.
 
 ---
 
@@ -987,22 +1227,30 @@ pages_build_output_dir = "dist"
 - [ ] CRUD ingrédients (recherche, scan CB, custom)
 - [ ] CRUD recettes avec calcul nutritionnel + photo (Blob)
 - [ ] Planning hebdomadaire (repository + écran calendrier)
-- [ ] Écran ajout recette à un créneau
+- [ ] Écran ajout recette à un créneau (source recette / plat préparé / libre)
+- [ ] Import de recettes JSON + écran de résolution des ingrédients (§2.11)
 
 ### Phase 3 — Courses & Suivi (2 semaines)
 - [ ] Génération liste de courses
 - [ ] Écran liste de courses (cochage interactif)
 - [ ] Log journalier (marquer repas consommés)
-- [ ] Dashboard jour (anneau calories, macros)
-- [ ] Gestion des écarts (prévu + imprévu) + compensation
+- [ ] Dashboard jour (anneau calories, macros, fibres)
+- [ ] Gestion des écarts (prévu + imprévu) + compensation, boutons repas types
 
-### Phase 4 — Analytics & Export (2 semaines)
+### Phase 4 — Extras, plats préparés & repas restaurant (2-3 semaines)
+- [ ] Bibliothèque plats préparés (CRUD, favoris, import par code-barres) — §2.9
+- [ ] Écran détail de créneau : extras (ingrédient/plat préparé/libre) + total vs objectif — §2.8
+- [ ] Détection de dépassement de créneau (>115 %) + déclenchement écart pré-rempli
+- [ ] Assistant repas restaurant en 4 étapes (3 méthodes d'estimation) — §2.10
+- [ ] Seed de la bibliothèque des ~80 plats types
+
+### Phase 5 — Analytics & Export (2 semaines)
 - [ ] Repository analytics (jour / semaine / mois)
 - [ ] Écrans graphiques (Recharts) — semaine, mois, tendances
 - [ ] Génération PDF client (pdf-lib) — bilan semaine + liste de courses
 - [ ] Web Share API pour export/partage
 
-### Phase 5 — PWA, Finitions & UX (2 semaines)
+### Phase 6 — PWA, Finitions & UX (2 semaines)
 - [ ] Peaufinage manifest/icônes/installabilité
 - [ ] Stratégies de cache Workbox (app shell + OFF API)
 - [ ] Export/Import JSON (backup) — §11.2

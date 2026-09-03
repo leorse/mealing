@@ -1,4 +1,4 @@
-import type { UserProfile } from '../db/schema';
+import type { UserProfile, Ingredient } from '../db/schema';
 
 const ACTIVITY_MULTIPLIERS: Record<UserProfile['activityLevel'], number> = {
   SEDENTARY: 1.2,
@@ -78,6 +78,62 @@ export function computeCompensation(
     reductionPerDay: Math.round(surplus / compensationSpread),
     days: compensationSpread,
   };
+}
+
+export interface RecipeNutritionItem {
+  ingredient: Ingredient;
+  quantityG: number;
+}
+
+export interface RecipeNutritionTotals {
+  calories: number;
+  proteins: number;
+  carbs: number;
+  sugars: number;
+  fat: number;
+  saturatedFat: number;
+  fiber: number;
+}
+
+function sumPer100g(items: RecipeNutritionItem[], field: keyof Ingredient): number {
+  return items.reduce((sum, { ingredient, quantityG }) => {
+    const value = ingredient[field];
+    return sum + (typeof value === 'number' ? (value / 100) * quantityG : 0);
+  }, 0);
+}
+
+/** Valeurs nutritionnelles totales d'une recette, à partir de ses ingrédients et quantités (§8.4). */
+export function computeRecipeNutrition(items: RecipeNutritionItem[]): RecipeNutritionTotals {
+  return {
+    calories: sumPer100g(items, 'calories100g'),
+    proteins: sumPer100g(items, 'proteins100g'),
+    carbs: sumPer100g(items, 'carbs100g'),
+    sugars: sumPer100g(items, 'sugars100g'),
+    fat: sumPer100g(items, 'fat100g'),
+    saturatedFat: sumPer100g(items, 'saturatedFat100g'),
+    fiber: sumPer100g(items, 'fiber100g'),
+  };
+}
+
+export function perServing(totals: RecipeNutritionTotals, servings: number): RecipeNutritionTotals {
+  const n = servings > 0 ? servings : 1;
+  return {
+    calories: totals.calories / n,
+    proteins: totals.proteins / n,
+    carbs: totals.carbs / n,
+    sugars: totals.sugars / n,
+    fat: totals.fat / n,
+    saturatedFat: totals.saturatedFat / n,
+    fiber: totals.fiber / n,
+  };
+}
+
+/** Ingrédient principal = plus grosse quantité en grammes, utilisé pour le critère "healthy" (§8.5). */
+export function mainIngredient(items: RecipeNutritionItem[]): Ingredient | undefined {
+  return items.reduce<RecipeNutritionItem | undefined>(
+    (max, item) => (!max || item.quantityG > max.quantityG ? item : max),
+    undefined,
+  )?.ingredient;
 }
 
 export interface HealthyCriteriaInput {
