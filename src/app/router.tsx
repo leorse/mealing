@@ -5,7 +5,6 @@ import ProfileSetupScreen from '../screens/onboarding/ProfileSetupScreen';
 import HomeScreen from '../screens/home/HomeScreen';
 import WeekPlanScreen from '../screens/planning/WeekPlanScreen';
 import DayDetailScreen from '../screens/planning/DayDetailScreen';
-import AddMealScreen from '../screens/planning/AddMealScreen';
 import RecipeListScreen from '../screens/recipes/RecipeListScreen';
 import RecipeDetailScreen from '../screens/recipes/RecipeDetailScreen';
 import RecipeFormScreen from '../screens/recipes/RecipeFormScreen';
@@ -31,7 +30,6 @@ export const router = createBrowserRouter([
           { path: '/', element: <HomeScreen /> },
           { path: '/planning', element: <WeekPlanScreen /> },
           { path: '/planning/:date', element: <DayDetailScreen /> },
-          { path: '/planning/:date/add', element: <AddMealScreen /> },
           { path: '/recipes', element: <RecipeListScreen /> },
           { path: '/recipes/new', element: <RecipeFormScreen /> },
           { path: '/recipes/:id', element: <RecipeDetailScreen /> },

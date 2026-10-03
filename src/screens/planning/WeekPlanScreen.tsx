@@ -1,12 +1,14 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useUiStore } from '../../store/useUiStore';
 import { useWeekSlots } from '../../hooks/useWeekSlots';
+import { deleteSlot } from '../../db/repositories/planningRepository';
 import { useProfile, PROFILE_LOADING } from '../../hooks/useProfile';
 import { computeTargetCalories } from '../../services/nutrition';
 import { addDays, weekDates } from '../../utils/date';
 import MaskIcon from '../../components/MaskIcon';
+import MealPickerModal from '../../components/MealPickerModal';
 import type { MealSlot } from '../../db/schema';
 
 const MEAL_TYPES: { type: MealSlot['mealType']; label: string }[] = [
@@ -30,6 +32,8 @@ export default function WeekPlanScreen() {
   const { selectedWeekStart, setSelectedWeekStart } = useUiStore();
   const slots = useWeekSlots(selectedWeekStart);
   const profile = useProfile();
+  const [adding, setAdding] = useState<{ date: string; type: MealSlot['mealType'] } | null>(null);
+  const [editing, setEditing] = useState<MealSlot | null>(null);
 
   if (profile === PROFILE_LOADING || profile === undefined) return null;
 
@@ -63,18 +67,42 @@ export default function WeekPlanScreen() {
                 </div>
 
                 {MEAL_TYPES.map(({ type, label }) => {
-                  const slot = daySlots.find((s) => s.mealType === type);
-                  return slot ? (
-                    <div key={type} className="meal-slot meal-slot--filled">
+                  const typeSlots = daySlots.filter((s) => s.mealType === type);
+                  return (
+                    <div key={type} className="meal-group">
                       <span className="meal-slot-type">{label}</span>
-                      <span>{slot.freeLabel}</span>
-                      <span className="meal-slot-kcal">{slotCalories(slot)} kcal</span>
+
+                      {typeSlots.map((slot) => (
+                        <div key={slot.id} className="meal-slot meal-slot--filled">
+                          <button
+                            type="button"
+                            className="meal-entry"
+                            onClick={() => setEditing(slot)}
+                            aria-label={`Modifier ${slot.freeLabel}`}
+                          >
+                            <span className="meal-entry-name">{slot.freeLabel}</span>
+                            <span className="meal-slot-kcal">{slotCalories(slot)} kcal</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="meal-entry-delete"
+                            onClick={() => deleteSlot(slot.id!)}
+                            aria-label={`Supprimer ${slot.freeLabel}`}
+                          >
+                            <MaskIcon src="/icons/common/trash.svg" color="#e74c3c" size="0.85rem" />
+                          </button>
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        className="meal-slot meal-slot--empty"
+                        onClick={() => setAdding({ date, type })}
+                        aria-label={`Ajouter un ${label.toLowerCase()}`}
+                      >
+                        <MaskIcon src="/icons/common/add.svg" color="currentColor" size="1rem" />
+                      </button>
                     </div>
-                  ) : (
-                    <Link key={type} to={`/planning/${date}/add?type=${type}`} className="meal-slot meal-slot--empty">
-                      <span className="meal-slot-type">{label}</span>
-                      <MaskIcon src="/icons/common/add.svg" color="currentColor" size="1rem" />
-                    </Link>
                   );
                 })}
               </div>
@@ -82,6 +110,25 @@ export default function WeekPlanScreen() {
           })}
         </div>
       </div>
+
+      {adding && (
+        <MealPickerModal
+          open
+          slotDate={adding.date}
+          mealType={adding.type}
+          onClose={() => setAdding(null)}
+        />
+      )}
+
+      {editing && (
+        <MealPickerModal
+          open
+          slotDate={editing.slotDate}
+          mealType={editing.mealType}
+          slot={editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 }

@@ -278,12 +278,57 @@ body {
 }
 
 .meal-slot--empty {
-  border: 1px dashed #ccc;
+  border: 1px dashed color-mix(in srgb, canvasText 25%, transparent);
+  background: none;
+  color: inherit;
   opacity: 0.7;
   align-items: center;
   justify-content: center;
   flex-direction: row;
   gap: 0.35rem;
+  min-height: 1.6rem;
+}
+
+/* Un créneau regroupe son libellé, ses entrées, puis le bouton d'ajout toujours présent. */
+.meal-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.meal-group .meal-slot--filled {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 0;
+}
+
+.meal-entry {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  min-width: 0;
+}
+
+.meal-entry-name {
+  overflow-wrap: anywhere;
+}
+
+.meal-entry-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  flex-shrink: 0;
 }
 
 .meal-slot-type {
@@ -642,6 +687,38 @@ body {
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.9rem;
+}
+
+.picker-quantity input {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid color-mix(in srgb, canvasText 20%, transparent);
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+/* Sélecteur Recette / Écart de la fenêtre d'ajout au planning. */
+.mode-toggle {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.mode-toggle button {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid color-mix(in srgb, canvasText 20%, transparent);
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.mode-toggle button.active {
+  background: #2ecc71;
+  border-color: #2ecc71;
+  color: #fff;
+  font-weight: 600;
 }
 
 .modal-button--yes {
