@@ -3,7 +3,7 @@ import { list as listRecipes, getIngredients } from '../db/repositories/recipeRe
 import { getById as getIngredientById } from '../db/repositories/ingredientRepository';
 import { computeRecipeNutrition, perServing } from '../services/nutrition';
 import { addSlotForWeek, updateSlot } from '../db/repositories/planningRepository';
-import { startOfWeekIso } from '../utils/date';
+import { startOfWeekIso, fromIsoDate } from '../utils/date';
 import type { MealSlot, Recipe } from '../db/schema';
 
 type Mode = 'RECIPE' | 'DEVIATION';
@@ -107,7 +107,7 @@ export default function MealPickerModal({ open, slotDate, mealType, slot, onClos
     if (isEdit && slot?.id) {
       await updateSlot(slot.id, data);
     } else {
-      await addSlotForWeek(startOfWeekIso(new Date(slotDate)), data);
+      await addSlotForWeek(startOfWeekIso(fromIsoDate(slotDate)), data);
     }
     onClose();
   }

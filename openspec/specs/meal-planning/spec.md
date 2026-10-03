@@ -140,13 +140,39 @@ Le total calorique affiché pour un jour SHALL être la somme des calories de to
 
 ### Requirement: Une entrée se retire du planning
 
-Chaque entrée d'un créneau SHALL porter une action de suppression accessible depuis la grille, distincte de l'action qui ouvre la modification.
+Chaque entrée d'un créneau SHALL porter une action de suppression accessible depuis la grille, distincte de l'action qui ouvre la modification. Cette action SHALL demander un appui maintenu : la suppression n'a lieu qu'au terme de l'appui, et un relâchement prématuré l'annule.
 
 #### Scenario: Suppression d'une entrée
 
-- **WHEN** l'utilisateur active l'action de suppression d'une entrée
+- **WHEN** l'utilisateur maintient l'action de suppression d'une entrée jusqu'à son terme
 - **THEN** cette entrée disparaît du créneau
 - **AND** les autres entrées du créneau sont conservées
+
+#### Scenario: Appui relâché trop tôt
+
+- **WHEN** l'utilisateur commence à maintenir l'action de suppression puis relâche avant son terme
+- **THEN** l'entrée est conservée
+
+#### Scenario: Appui qui quitte la commande
+
+- **WHEN** l'utilisateur maintient l'action de suppression puis déplace son doigt ou son curseur hors de la commande avant le terme
+- **THEN** l'entrée est conservée
+
+#### Scenario: Clic simple sans effet
+
+- **WHEN** l'utilisateur clique brièvement sur l'action de suppression
+- **THEN** l'entrée est conservée
+
+#### Scenario: Progression visible pendant l'appui
+
+- **WHEN** l'utilisateur maintient l'action de suppression
+- **THEN** la commande montre la progression de l'appui vers la suppression
+
+#### Scenario: Retour à l'état initial après annulation
+
+- **WHEN** un appui est annulé avant son terme
+- **THEN** la commande revient à son apparence de départ
+- **AND** un nouvel appui repart du début
 
 #### Scenario: Le total du jour suit la suppression
 
@@ -160,8 +186,18 @@ Chaque entrée d'un créneau SHALL porter une action de suppression accessible d
 
 #### Scenario: Supprimer n'ouvre pas la modification
 
-- **WHEN** l'utilisateur active l'action de suppression d'une entrée
+- **WHEN** l'utilisateur maintient puis relâche l'action de suppression d'une entrée
 - **THEN** la fenêtre de modification ne s'ouvre pas
+
+#### Scenario: Suppression au clavier
+
+- **WHEN** l'utilisateur donne le focus à l'action de suppression et maintient la touche d'activation jusqu'au terme
+- **THEN** l'entrée est supprimée
+
+#### Scenario: Touche relâchée trop tôt
+
+- **WHEN** l'utilisateur maintient la touche d'activation puis la relâche avant le terme
+- **THEN** l'entrée est conservée
 
 ### Requirement: Une entrée existante se modifie dans la même fenêtre
 
@@ -182,3 +218,147 @@ Activer une entrée déjà posée SHALL rouvrir la fenêtre en modification, pr�
 
 - **WHEN** l'utilisateur rouvre une entrée, modifie des valeurs puis annule
 - **THEN** l'entrée reste telle qu'elle était
+
+### Requirement: Une entrée de repas enregistré porte une pastille de courses
+
+Toute entrée du planning référençant un repas enregistré — recette maison ou plat tout prêt — SHALL porter une pastille de courses, distincte de l'action qui ouvre la modification et de celle qui supprime l'entrée.
+
+#### Scenario: Entrée portant une recette
+
+- **WHEN** un créneau contient une entrée référençant une recette maison
+- **THEN** cette entrée affiche une pastille de courses
+
+#### Scenario: Entrée portant un plat tout prêt
+
+- **WHEN** un créneau contient une entrée référençant un plat tout prêt
+- **THEN** cette entrée affiche une pastille de courses
+
+#### Scenario: Entrée d'écart
+
+- **WHEN** un créneau contient une entrée d'écart, qui ne référence aucun repas enregistré
+- **THEN** cette entrée n'affiche pas de pastille de courses
+
+### Requirement: La pastille montre si le plat part aux courses
+
+La pastille SHALL présenter deux états visuellement distincts : un état grisé lorsque le plat ne doit pas alimenter la liste de courses, et un état vert lorsqu'il le doit.
+
+#### Scenario: Plat exclu des courses
+
+- **WHEN** une entrée n'est pas marquée pour les courses
+- **THEN** sa pastille est grisée
+
+#### Scenario: Plat retenu pour les courses
+
+- **WHEN** une entrée est marquée pour les courses
+- **THEN** sa pastille est verte
+
+### Requirement: Le marquage est désactivé par défaut
+
+Une entrée SHALL être non marquée à sa création, et une entrée enregistrée avant l'existence de ce marquage SHALL être traitée comme non marquée. Aucun repas NE SHALL alimenter la liste de courses sans une action explicite de l'utilisateur.
+
+#### Scenario: Repas fraîchement ajouté
+
+- **WHEN** l'utilisateur ajoute un repas au planning
+- **THEN** sa pastille de courses est grisée
+
+#### Scenario: Repas planifié de longue date
+
+- **WHEN** l'utilisateur consulte un repas planifié avant l'arrivée de cette fonctionnalité
+- **THEN** sa pastille de courses est grisée
+
+#### Scenario: Semaine entière non marquée
+
+- **WHEN** l'utilisateur planifie une semaine complète sans toucher aux pastilles
+- **THEN** aucun de ces repas n'est destiné à la liste de courses
+
+### Requirement: La pastille bascule au clic et son état est conservé
+
+Activer la pastille SHALL inverser l'état de marquage de l'entrée, et cet état SHALL être enregistré de façon à survivre au rechargement de l'application.
+
+#### Scenario: Marquage d'un plat
+
+- **WHEN** l'utilisateur active la pastille grisée d'une entrée
+- **THEN** la pastille devient verte
+
+#### Scenario: Retrait du marquage
+
+- **WHEN** l'utilisateur active la pastille verte d'une entrée
+- **THEN** la pastille redevient grisée
+
+#### Scenario: Persistance
+
+- **WHEN** l'utilisateur marque un plat puis recharge l'application
+- **THEN** la pastille de ce plat est toujours verte
+
+#### Scenario: Le marquage n'ouvre rien
+
+- **WHEN** l'utilisateur active la pastille d'une entrée
+- **THEN** la fenêtre de modification ne s'ouvre pas
+- **AND** l'entrée n'est pas supprimée
+
+### Requirement: Le marquage est propre à chaque entrée
+
+Le marquage SHALL porter sur une seule entrée, sans effet sur les autres entrées du même créneau, du même jour, ni sur les autres occurrences du même repas dans la semaine.
+
+#### Scenario: Deux entrées sur le même créneau
+
+- **WHEN** un créneau contient deux entrées et que l'utilisateur en marque une
+- **THEN** l'autre entrée reste non marquée
+
+#### Scenario: Même recette planifiée deux fois
+
+- **WHEN** la même recette est planifiée lundi et jeudi, et que l'utilisateur marque celle de lundi
+- **THEN** celle de jeudi reste non marquée
+
+### Requirement: Le planning ouvre la semaine contenant aujourd'hui
+
+À son ouverture, le planning SHALL afficher la semaine qui contient la date du jour selon l'heure locale de l'utilisateur, quelle que soit l'heure à laquelle l'application est lancée et quel que soit son fuseau horaire.
+
+#### Scenario: Ouverture en journée
+
+- **WHEN** l'utilisateur ouvre le planning en milieu de journée
+- **THEN** la semaine affichée contient la date du jour
+
+#### Scenario: Ouverture juste après minuit
+
+- **WHEN** l'utilisateur ouvre le planning entre minuit et deux heures du matin
+- **THEN** la semaine affichée contient la date du jour
+- **AND** elle est la même que celle affichée plus tard dans la même journée
+
+#### Scenario: Les repas déjà planifiés restent visibles
+
+- **WHEN** l'utilisateur a planifié des repas dans la semaine en cours et rouvre l'application à n'importe quelle heure
+- **THEN** ces repas apparaissent sur leurs créneaux
+
+### Requirement: Une date se convertit sans glissement de jour
+
+La conversion d'une date en texte et sa relecture SHALL préserver le jour tel que l'utilisateur le voit, sans décalage lié au fuseau horaire.
+
+#### Scenario: Aller-retour en soirée
+
+- **WHEN** une date du jour courant est convertie en texte puis relue, en soirée
+- **THEN** la date obtenue désigne le même jour
+
+#### Scenario: Aller-retour juste après minuit
+
+- **WHEN** une date du jour courant est convertie en texte puis relue, peu après minuit
+- **THEN** la date obtenue désigne le même jour
+
+#### Scenario: Fuseau à décalage négatif
+
+- **WHEN** l'utilisateur se trouve dans un fuseau en retard sur le temps universel
+- **THEN** la conversion et la relecture d'une date désignent le même jour qu'à l'écran
+
+### Requirement: Les jours affichés suivent le début de semaine
+
+Les sept jours présentés par le planning SHALL être les sept jours consécutifs à partir du lundi de la semaine affichée, sans jour manquant ni répété, quel que soit le fuseau.
+
+#### Scenario: Semaine complète du lundi au dimanche
+
+- **WHEN** le planning affiche une semaine
+- **THEN** il présente sept colonnes, du lundi au dimanche
+
+#### Scenario: Navigation d'une semaine à l'autre
+
+- **WHEN** l'utilisateur passe à la semaine précédente puis revient à la suivante
+- **THEN** il retrouve exactement la semaine de départ

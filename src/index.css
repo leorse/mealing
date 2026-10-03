@@ -214,7 +214,7 @@ body {
 
 .week-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(130px, 1fr));
+  grid-template-columns: repeat(7, minmax(150px, 1fr));
   grid-template-rows: 1fr;
   gap: 0.5rem;
   height: 100%;
@@ -317,18 +317,100 @@ body {
   min-width: 0;
 }
 
+/* Un nom long est tronqué plutôt que replié : il chassait la pastille et la corbeille.
+   Le titre natif donne le nom entier au survol, en attendant le zoom prévu. */
 .meal-entry-name {
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-.meal-entry-delete {
+/* Les deux commandes d'une entrée sont des disques colorés : sans fond, les icônes
+   se perdaient sur la trame du créneau. Teintes en couleurs système ou en color-mix,
+   pour tenir en thème clair comme en thème sombre. */
+.meal-entry-delete,
+.meal-entry-shop {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: none;
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
   border: none;
-  padding: 0.25rem;
+  border-radius: 50%;
   flex-shrink: 0;
+}
+
+/* Retrait : disque rouge pâle, symbole rouge vif. */
+.meal-entry-delete {
+  background: color-mix(in srgb, #e74c3c 18%, transparent);
+  color: #e74c3c;
+  position: relative;
+  /* Un appui long ne doit déclencher ni sélection ni menu contextuel du navigateur. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Le disque se remplit pendant l'appui : relâcher avant la fin annule la suppression. */
+.meal-entry-delete::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #e74c3c;
+  transform: scale(0);
+}
+
+.meal-entry-delete > * {
+  position: relative;
+  z-index: 1;
+}
+
+.meal-entry-delete.holding::before {
+  animation: hold-fill 700ms linear forwards;
+}
+
+/* Le symbole vire au blanc à mesure que le rouge l'entoure. */
+.meal-entry-delete.holding {
+  animation: hold-symbol 700ms linear forwards;
+}
+
+@keyframes hold-fill {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+
+@keyframes hold-symbol {
+  from { color: #e74c3c; }
+  to { color: #fff; }
+}
+
+/* Mouvement réduit : la protection reste, sa mise en scène disparaît. */
+@media (prefers-reduced-motion: reduce) {
+  .meal-entry-delete.holding::before {
+    animation: none;
+    transform: scale(1);
+  }
+
+  .meal-entry-delete.holding {
+    animation: none;
+    color: #fff;
+  }
+}
+
+/* Courses : disque gris plus foncé que le créneau (6 %), symbole gris soutenu… */
+.meal-entry-shop {
+  background: color-mix(in srgb, canvasText 18%, transparent);
+  color: color-mix(in srgb, canvasText 65%, transparent);
+}
+
+/* …puis le même dessin en vert une fois le plat retenu. */
+.meal-entry-shop.active {
+  background: color-mix(in srgb, #2ecc71 22%, transparent);
+  color: #2ecc71;
 }
 
 .meal-slot-type {

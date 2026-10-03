@@ -87,6 +87,9 @@ export interface MealSlot {
   caloriesOverride?: number;
   isConsumed: boolean;
   consumedAt?: string;
+  // Non indexé, donc sans migration : absent sur les créneaux antérieurs, et lu comme non marqué.
+  // Rien ne part aux courses sans un clic explicite sur la pastille du planning.
+  includeInShopping?: boolean;
 }
 
 export interface DailyLog {

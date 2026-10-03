@@ -3,12 +3,13 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useUiStore } from '../../store/useUiStore';
 import { useWeekSlots } from '../../hooks/useWeekSlots';
-import { deleteSlot } from '../../db/repositories/planningRepository';
+import { deleteSlot, updateSlot } from '../../db/repositories/planningRepository';
 import { useProfile, PROFILE_LOADING } from '../../hooks/useProfile';
 import { computeTargetCalories } from '../../services/nutrition';
-import { addDays, weekDates } from '../../utils/date';
+import { addDays, weekDates, fromIsoDate } from '../../utils/date';
 import MaskIcon from '../../components/MaskIcon';
 import MealPickerModal from '../../components/MealPickerModal';
+import HoldToDeleteButton from '../../components/HoldToDeleteButton';
 import type { MealSlot } from '../../db/schema';
 
 const MEAL_TYPES: { type: MealSlot['mealType']; label: string }[] = [
@@ -46,7 +47,7 @@ export default function WeekPlanScreen() {
         <button type="button" onClick={() => setSelectedWeekStart(addDays(selectedWeekStart, -7))} aria-label="Semaine précédente">
           ‹
         </button>
-        <h1>Semaine du {format(new Date(selectedWeekStart), 'd MMM', { locale: fr })}</h1>
+        <h1>Semaine du {format(fromIsoDate(selectedWeekStart), 'd MMM', { locale: fr })}</h1>
         <button type="button" onClick={() => setSelectedWeekStart(addDays(selectedWeekStart, 7))} aria-label="Semaine suivante">
           ›
         </button>
@@ -62,7 +63,7 @@ export default function WeekPlanScreen() {
             return (
               <div key={date} className="day-column">
                 <div className="day-column-header">
-                  <span className="day-name">{format(new Date(date), 'EEE d', { locale: fr })}</span>
+                  <span className="day-name">{format(fromIsoDate(date), 'EEE d', { locale: fr })}</span>
                   <span className={`day-total day-total--${status}`}>{dayCalories} kcal</span>
                 </div>
 
@@ -74,23 +75,34 @@ export default function WeekPlanScreen() {
 
                       {typeSlots.map((slot) => (
                         <div key={slot.id} className="meal-slot meal-slot--filled">
+                          {slot.recipeId && (
+                            <button
+                              type="button"
+                              className={`meal-entry-shop ${slot.includeInShopping ? 'active' : ''}`}
+                              onClick={() => updateSlot(slot.id!, { includeInShopping: !slot.includeInShopping })}
+                              aria-pressed={Boolean(slot.includeInShopping)}
+                              aria-label={
+                                slot.includeInShopping
+                                  ? `Retirer ${slot.freeLabel} des courses`
+                                  : `Ajouter ${slot.freeLabel} aux courses`
+                              }
+                            >
+                              <MaskIcon src="/icons/nav/caddie.svg" color="currentColor" size="0.85rem" />
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="meal-entry"
                             onClick={() => setEditing(slot)}
                             aria-label={`Modifier ${slot.freeLabel}`}
                           >
-                            <span className="meal-entry-name">{slot.freeLabel}</span>
+                            <span className="meal-entry-name" title={slot.freeLabel}>{slot.freeLabel}</span>
                             <span className="meal-slot-kcal">{slotCalories(slot)} kcal</span>
                           </button>
-                          <button
-                            type="button"
-                            className="meal-entry-delete"
-                            onClick={() => deleteSlot(slot.id!)}
-                            aria-label={`Supprimer ${slot.freeLabel}`}
-                          >
-                            <MaskIcon src="/icons/common/trash.svg" color="#e74c3c" size="0.85rem" />
-                          </button>
+                          <HoldToDeleteButton
+                            label={`Supprimer ${slot.freeLabel} — maintenir`}
+                            onConfirm={() => deleteSlot(slot.id!)}
+                          />
                         </div>
                       ))}
 
