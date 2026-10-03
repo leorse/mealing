@@ -27,7 +27,7 @@ mealing/
 │   ├── store/        État UI (Zustand)
 │   └── hooks/        Hooks (dont lecture réactive Dexie)
 ├── public/            Manifest PWA, icônes
-└── wrangler.toml       Déploiement Cloudflare Pages
+└── wrangler.toml       Déploiement Cloudflare Workers
 ```
 
 ---
@@ -54,7 +54,7 @@ Ouvrir **http://localhost:5173**. Le premier lancement redirige automatiquement 
 ## Build & déploiement
 
 ```bash
-npm run build
+npm run deploy
 ```
 
-Génère un site statique dans `dist/`, déployable sur **Cloudflare Pages** (build command `npm run build`, output directory `dist`).
+Génère le site statique dans `dist/` (`npm run build`) puis le publie sur **Cloudflare Workers** (`wrangler deploy`, configuration dans `wrangler.toml`).

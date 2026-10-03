@@ -6,6 +6,7 @@ import { useWeekSlots } from '../../hooks/useWeekSlots';
 import { useProfile, PROFILE_LOADING } from '../../hooks/useProfile';
 import { computeTargetCalories } from '../../services/nutrition';
 import { addDays, weekDates } from '../../utils/date';
+import MaskIcon from '../../components/MaskIcon';
 import type { MealSlot } from '../../db/schema';
 
 const MEAL_TYPES: { type: MealSlot['mealType']; label: string }[] = [
@@ -72,7 +73,7 @@ export default function WeekPlanScreen() {
                   ) : (
                     <Link key={type} to={`/planning/${date}/add?type=${type}`} className="meal-slot meal-slot--empty">
                       <span className="meal-slot-type">{label}</span>
-                      <span>+</span>
+                      <MaskIcon src="/icons/common/add.svg" color="currentColor" size="1rem" />
                     </Link>
                   );
                 })}

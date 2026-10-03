@@ -9,6 +9,7 @@
     "dev": "vite",
     "prebuild": "npm run seed:ciqual",
     "build": "tsc -b && vite build",
+    "deploy": "npm run build && npx wrangler deploy",
     "lint": "oxlint",
     "preview": "vite preview"
   },

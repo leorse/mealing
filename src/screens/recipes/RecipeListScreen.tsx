@@ -55,7 +55,7 @@ export default function RecipeListScreen() {
       </ul>
 
       <Link to="/recipes/new" className="fab" aria-label="Créer une recette">
-        +
+        <MaskIcon src="/icons/common/add.svg" color="currentColor" size="2rem" />
       </Link>
 
       <ConfirmModal

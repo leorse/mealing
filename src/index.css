@@ -525,9 +525,9 @@ body {
   font-size: 1rem;
 }
 
-.button-primary-plus {
-  font-size: 1.2rem;
-  line-height: 1;
+.button-primary--neutral {
+  background: color-mix(in srgb, canvasText 12%, transparent);
+  color: canvasText;
 }
 
 .modal-overlay {
@@ -572,6 +572,78 @@ body {
   color: #fff;
 }
 
+.modal-button:disabled {
+  opacity: 0.45;
+}
+
+/* Fenêtre de sélection d'ingrédient : hauteur bornée, seule la liste défile. */
+.modal-card--picker {
+  max-width: 380px;
+  max-height: min(32rem, 80dvh);
+  gap: 0.75rem;
+}
+
+.picker-search,
+.picker-quantity input {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid color-mix(in srgb, canvasText 20%, transparent);
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.picker-results {
+  flex: 1;
+  min-height: 6rem;
+  overflow-y: auto;
+  border: 1px solid color-mix(in srgb, canvasText 20%, transparent);
+  border-radius: 8px;
+}
+
+.picker-result-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.picker-result {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, canvasText 10%, transparent);
+}
+
+.picker-result.selected {
+  background: color-mix(in srgb, #2ecc71 25%, transparent);
+  font-weight: 600;
+}
+
+.picker-result:disabled {
+  opacity: 0.5;
+}
+
+.picker-result-note {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.picker-quantity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
 .modal-button--yes {
   background: #2ecc71;
 }
@@ -602,8 +674,10 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
+/* Zone d'ingrédients et fenêtre de sélection : couleurs système uniquement,
+   pour rester lisibles en thème clair comme en thème sombre. */
 .ingredient-picker {
-  border: 1px solid #ddd;
+  border: 1px solid color-mix(in srgb, canvasText 20%, transparent);
   border-radius: 10px;
   padding: 0.75rem;
   display: flex;
@@ -613,26 +687,25 @@ body {
 
 .ingredient-picker input {
   padding: 0.5rem 0.6rem;
-  border: 1px solid #ddd;
+  border: 1px solid color-mix(in srgb, canvasText 20%, transparent);
   border-radius: 8px;
-}
-
-.ingredient-suggestions {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.ingredient-suggestions li button {
-  width: 100%;
-  text-align: left;
-  padding: 0.5rem 0.6rem;
   background: none;
-  border: none;
-  border-bottom: 1px solid #eee;
+  color: inherit;
+}
+
+.ingredient-add {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid color-mix(in srgb, canvasText 20%, transparent);
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font-size: 1.4rem;
+  line-height: 1;
 }
 
 .ingredient-list {

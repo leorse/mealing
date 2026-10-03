@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { search as searchIngredients, getById as getIngredientById } from '../../db/repositories/ingredientRepository';
+import { getById as getIngredientById } from '../../db/repositories/ingredientRepository';
+import IngredientPickerModal from '../../components/IngredientPickerModal';
+import MaskIcon from '../../components/MaskIcon';
 import {
   create,
   update,
@@ -89,8 +91,7 @@ export default function RecipeFormScreen() {
   const [carbsPerServing, setCarbsPerServing] = useState<number | ''>('');
   const [fatPerServing, setFatPerServing] = useState<number | ''>('');
 
-  const [ingredientQuery, setIngredientQuery] = useState('');
-  const [ingredientResults, setIngredientResults] = useState<Ingredient[]>([]);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -122,25 +123,10 @@ export default function RecipeFormScreen() {
     })();
   }, [id]);
 
-  useEffect(() => {
-    if (ingredientQuery.trim().length < 2) {
-      setIngredientResults([]);
-      return;
-    }
-    let cancelled = false;
-    searchIngredients(ingredientQuery).then((results) => {
-      if (!cancelled) setIngredientResults(results);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [ingredientQuery]);
-
-  function addIngredient(ingredient: Ingredient) {
+  function addIngredient({ ingredient, quantityG }: { ingredient: Ingredient; quantityG: number }) {
     if (ingredients.some((d) => d.ingredient.id === ingredient.id)) return;
-    setIngredients([...ingredients, { ingredient, quantityG: 100 }]);
-    setIngredientQuery('');
-    setIngredientResults([]);
+    setIngredients([...ingredients, { ingredient, quantityG }]);
+    setIsPickerOpen(false);
   }
 
   function updateQuantity(ingredientId: string, quantityG: number) {
@@ -310,23 +296,15 @@ export default function RecipeFormScreen() {
           <fieldset className="ingredient-picker">
             <legend>Ingrédients</legend>
 
-            <input
-              placeholder="Rechercher un ingrédient à ajouter…"
-              value={ingredientQuery}
-              onChange={(e) => setIngredientQuery(e.target.value)}
-            />
-
-            {ingredientResults.length > 0 && (
-              <ul className="ingredient-suggestions">
-                {ingredientResults.map((ingredient) => (
-                  <li key={ingredient.id}>
-                    <button type="button" onClick={() => addIngredient(ingredient)}>
-                      {ingredient.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <button
+              type="button"
+              className="ingredient-add"
+              onClick={() => setIsPickerOpen(true)}
+              aria-label="Ajouter un ingrédient"
+              title="Ajouter un ingrédient"
+            >
+              <MaskIcon src="/icons/common/add.svg" color="currentColor" size="1.5rem" />
+            </button>
 
             {ingredients.length === 0 && <p className="empty-state">Aucun ingrédient ajouté.</p>}
 
@@ -342,26 +320,25 @@ export default function RecipeFormScreen() {
                   />
                   <span>g</span>
                   <button type="button" className="icon-button" onClick={() => removeIngredient(ingredient.id!)} aria-label="Retirer">
-                    ✕
+                    <MaskIcon src="/icons/common/trash.svg" color="#e74c3c" />
                   </button>
                 </li>
               ))}
             </ul>
           </fieldset>
+
+          <IngredientPickerModal
+            open={isPickerOpen}
+            existingIngredientIds={ingredients.map((d) => d.ingredient.id!)}
+            onConfirm={addIngredient}
+            onCancel={() => setIsPickerOpen(false)}
+          />
         </>
       )}
 
-      <button type="submit" className={isEdit ? undefined : 'button-primary'}>
-        {isEdit ? (
-          'Enregistrer'
-        ) : (
-          <>
-            <span className="button-primary-plus" aria-hidden>
-              +
-            </span>
-            Créer
-          </>
-        )}
+      <button type="submit" className={isEdit ? 'button-primary button-primary--neutral' : 'button-primary'}>
+        <MaskIcon src={isEdit ? '/icons/common/save.svg' : '/icons/common/add.svg'} color="currentColor" size="1.2rem" />
+        {isEdit ? 'Enregistrer' : 'Créer'}
       </button>
     </form>
   );
