@@ -1,4 +1,4 @@
-import { db, type WeekPlan, type MealSlot } from '../schema';
+import { db, type WeekPlan, type MealSlot, type ShoppingItemState } from '../schema';
 
 /** Lecture seule — n'écrit jamais, safe à utiliser dans une useLiveQuery. */
 export async function getWeek(weekStart: string): Promise<WeekPlan | undefined> {
@@ -54,6 +54,55 @@ export async function markConsumed(slotId: string, isConsumed: boolean): Promise
     isConsumed,
     consumedAt: isConsumed ? new Date().toISOString() : undefined,
   });
+}
+
+/** Créneaux marqués pour les courses, toutes dates confondues. Lecture seule. */
+export async function listShoppingSlots(): Promise<MealSlot[]> {
+  return db.mealSlots.filter((s) => s.includeInShopping === true && s.recipeId !== undefined).toArray();
+}
+
+/** Bascule de la pastille. Dans les deux sens, l'état des articles repart de zéro :
+ *  rallumer une pastille est le seul chemin de retour d'un article supprimé. */
+export async function setSlotShopping(slotId: string, include: boolean): Promise<void> {
+  await db.mealSlots.update(slotId, { includeInShopping: include, shoppingItemStates: undefined });
+}
+
+export interface ShoppingItemChange {
+  slotId: string;
+  itemIds: string[];
+  /** La suppression emporte les derniers articles du plat : le créneau quitte la liste. */
+  unmark?: boolean;
+}
+
+/** Pose un état sur des articles de plusieurs créneaux ; 'ON' les rend actifs.
+ *  En transaction : un double clic ne doit pas écraser le changement précédent. */
+export async function setShoppingItemStates(
+  changes: ShoppingItemChange[],
+  state: ShoppingItemState | 'ON',
+): Promise<void> {
+  await db.transaction('rw', db.mealSlots, async () => {
+    for (const change of changes) {
+      if (change.unmark) {
+        await db.mealSlots.update(change.slotId, { includeInShopping: false, shoppingItemStates: undefined });
+        continue;
+      }
+      const slot = await db.mealSlots.get(change.slotId);
+      if (!slot) continue;
+      const states = { ...slot.shoppingItemStates };
+      for (const itemId of change.itemIds) {
+        if (state === 'ON') delete states[itemId];
+        else states[itemId] = state;
+      }
+      await db.mealSlots.update(change.slotId, { shoppingItemStates: states });
+    }
+  });
+}
+
+/** Vide la liste de courses. Les repas restent au planning, pastilles éteintes. */
+export async function clearShoppingList(): Promise<void> {
+  await db.mealSlots
+    .filter((s) => s.includeInShopping === true)
+    .modify({ includeInShopping: false, shoppingItemStates: undefined });
 }
 
 export async function copyWeek(fromWeekStart: string, toWeekStart: string): Promise<void> {

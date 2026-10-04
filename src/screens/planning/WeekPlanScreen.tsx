@@ -3,21 +3,15 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useUiStore } from '../../store/useUiStore';
 import { useWeekSlots } from '../../hooks/useWeekSlots';
-import { deleteSlot, updateSlot } from '../../db/repositories/planningRepository';
+import { deleteSlot, setSlotShopping } from '../../db/repositories/planningRepository';
 import { useProfile, PROFILE_LOADING } from '../../hooks/useProfile';
 import { computeTargetCalories } from '../../services/nutrition';
 import { addDays, weekDates, fromIsoDate } from '../../utils/date';
+import { MEAL_TYPES } from '../../utils/mealTypes';
 import MaskIcon from '../../components/MaskIcon';
 import MealPickerModal from '../../components/MealPickerModal';
 import HoldToDeleteButton from '../../components/HoldToDeleteButton';
 import type { MealSlot } from '../../db/schema';
-
-const MEAL_TYPES: { type: MealSlot['mealType']; label: string }[] = [
-  { type: 'BREAKFAST', label: 'Petit-déj' },
-  { type: 'LUNCH', label: 'Déjeuner' },
-  { type: 'DINNER', label: 'Dîner' },
-  { type: 'SNACK', label: 'Collation' },
-];
 
 function slotCalories(slot: MealSlot): number {
   return slot.caloriesOverride ?? 0;
@@ -79,7 +73,7 @@ export default function WeekPlanScreen() {
                             <button
                               type="button"
                               className={`meal-entry-shop ${slot.includeInShopping ? 'active' : ''}`}
-                              onClick={() => updateSlot(slot.id!, { includeInShopping: !slot.includeInShopping })}
+                              onClick={() => setSlotShopping(slot.id!, !slot.includeInShopping)}
                               aria-pressed={Boolean(slot.includeInShopping)}
                               aria-label={
                                 slot.includeInShopping

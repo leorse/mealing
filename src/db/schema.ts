@@ -90,7 +90,13 @@ export interface MealSlot {
   // Non indexé, donc sans migration : absent sur les créneaux antérieurs, et lu comme non marqué.
   // Rien ne part aux courses sans un clic explicite sur la pastille du planning.
   includeInShopping?: boolean;
+  // État des articles de ce plat dans la liste de courses, lui aussi non indexé. Clé : identifiant
+  // d'ingrédient, ou de la recette elle-même pour un plat tout prêt. Un article absent est actif.
+  shoppingItemStates?: Record<string, ShoppingItemState>;
 }
+
+/** OFF : affiché grisé, hors quantités, réactivable. DELETED : retiré de la liste. */
+export type ShoppingItemState = 'OFF' | 'DELETED';
 
 export interface DailyLog {
   id?: string;

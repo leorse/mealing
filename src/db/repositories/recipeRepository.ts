@@ -12,6 +12,15 @@ export async function getIngredients(recipeId: string): Promise<RecipeIngredient
   return db.recipeIngredients.where('recipeId').equals(recipeId).toArray();
 }
 
+/** Chargement groupé ; les recettes disparues sont simplement absentes du résultat. */
+export async function getByIds(ids: string[]): Promise<Recipe[]> {
+  return (await db.recipes.bulkGet(ids)).filter((r): r is Recipe => r !== undefined);
+}
+
+export async function getIngredientsForRecipes(recipeIds: string[]): Promise<RecipeIngredient[]> {
+  return db.recipeIngredients.where('recipeId').anyOf(recipeIds).toArray();
+}
+
 export interface RecipeInput {
   name: string;
   description?: string;

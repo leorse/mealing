@@ -105,7 +105,13 @@ export default function MealPickerModal({ open, slotDate, mealType, slot, onClos
     };
 
     if (isEdit && slot?.id) {
-      await updateSlot(slot.id, data);
+      // Autre plat : l'état de ses articles aux courses ne vaut plus, et un écart n'a rien à acheter.
+      const recipeChanged = data.recipeId !== slot.recipeId;
+      await updateSlot(slot.id, {
+        ...data,
+        ...(recipeChanged && { shoppingItemStates: undefined }),
+        ...(recipeChanged && data.recipeId === undefined && { includeInShopping: false }),
+      });
     } else {
       await addSlotForWeek(startOfWeekIso(fromIsoDate(slotDate)), data);
     }

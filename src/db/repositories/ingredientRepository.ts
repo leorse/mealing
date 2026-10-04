@@ -17,6 +17,10 @@ export async function getById(id: string): Promise<Ingredient | undefined> {
   return db.ingredients.get(id);
 }
 
+export async function getByIds(ids: string[]): Promise<Ingredient[]> {
+  return (await db.ingredients.bulkGet(ids)).filter((i): i is Ingredient => i !== undefined);
+}
+
 export async function create(data: Omit<Ingredient, 'id' | 'createdAt' | 'isCustom' | 'source'>): Promise<Ingredient> {
   const ingredient: Ingredient = {
     ...data,
