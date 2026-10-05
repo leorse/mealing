@@ -1,12 +1,12 @@
 import { db, type Ingredient } from '../schema';
+import { rankIngredients } from '../../services/ingredientSearch';
 
+const SEARCH_LIMIT = 50;
+
+/** Classe tous les aliments correspondants avant de couper : le meilleur résultat n'est jamais écarté. */
 export async function search(query: string): Promise<Ingredient[]> {
-  const q = query.trim().toLowerCase();
-  if (!q) return db.ingredients.orderBy('name').limit(50).toArray();
-  return db.ingredients
-    .filter((i) => i.name.toLowerCase().includes(q) || (i.brand?.toLowerCase().includes(q) ?? false))
-    .limit(50)
-    .toArray();
+  if (!query.trim()) return db.ingredients.orderBy('name').limit(SEARCH_LIMIT).toArray();
+  return rankIngredients(await db.ingredients.toArray(), query).slice(0, SEARCH_LIMIT);
 }
 
 export async function getByBarcode(ean: string): Promise<Ingredient | undefined> {

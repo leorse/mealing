@@ -69,6 +69,15 @@ Comportement spécifié dans la capacité OpenSpec `shopping-list`. Calcul dans 
 - **Tout supprimer** : éteint toutes les pastilles après confirmation, sans supprimer aucun repas.
 - Agir sur un ingrédient depuis sa ligne groupée vise toutes ses occurrences ; depuis le détail déplié ou la vue par plat, une seule.
 
+## Recherche d'ingrédient
+
+Comportement spécifié dans la capacité OpenSpec `ingredient-search`. Classement dans [services/ingredientSearch.ts](../../src/services/ingredientSearch.ts) (fonctions pures), appelé par `ingredientRepository.search`.
+
+- Correspondance sur le nom ou la marque, **sans casse ni accents** (`normalize`).
+- Quatre niveaux, puis ordre alphabétique français dans chaque niveau. Pour « pomme » : 1 « Pomme, … » · 2 « Pomme Gala, … » (autre mot) · 3 « Pomme de terre, … » (liaison de, du, des, d', à, au, aux, en) · 4 « Jus de pomme » (ailleurs dans le nom, ou marque).
+- Une saisie partielle vaut le mot qu'elle commence : « pom » classe comme « pomme ».
+- Tous les aliments correspondants sont classés, **puis** la liste est coupée à 50.
+
 ## Recettes
 
 Comportement spécifié dans [openspec/specs/recipe-authoring/spec.md](../../openspec/specs/recipe-authoring/spec.md).
