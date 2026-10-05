@@ -10,6 +10,7 @@ timestamp: 2026-10-04T00:00:00Z
 
 ## Langue
 
+- **À l'écran, on dit « plat », jamais « recette »** : « plat maison » (`kind: 'RECIPE'`) et « plat tout prêt » (`kind: 'PREPARED'`). Le code garde `Recipe`, `recipeRepository`, `screens/recipes/` et la route `/recipes`, invisibles à l'utilisateur.
 - **Identifiants en anglais** (`addIngredient`, `quantityG`, `isHealthy`).
 - **Textes d'interface et commentaires en français**, typographie française : `…`, `«  »`, espace avant `?` et `:`.
 - **Valeurs d'énumération en majuscules anglaises** (`'RECIPE'`, `'EASY'`, `'LUNCH'`), traduites à l'affichage par une table locale (`DIFFICULTY_LABELS`, `MEAL_TYPES`).

@@ -37,7 +37,7 @@ export default function RecipeDetailScreen() {
   }, [id]);
 
   if (data === undefined) return null;
-  if (data === null) return <p className="screen">Recette introuvable.</p>;
+  if (data === null) return <p className="screen">Plat introuvable.</p>;
 
   const { recipe, items, totals, per } = data;
   const isPrepared = recipe.kind === 'PREPARED';
@@ -160,7 +160,7 @@ export default function RecipeDetailScreen() {
 
       <ConfirmModal
         open={confirmOpen}
-        message="Supprimer cette recette ?"
+        message="Supprimer ce plat ?"
         onConfirm={confirmDelete}
         onCancel={() => setConfirmOpen(false)}
       />

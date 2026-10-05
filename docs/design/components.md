@@ -21,7 +21,8 @@ Dans [src/components/](../../src/components/), export par défaut.
 | `ConfirmModal` | `open`, `message`, `onConfirm`, `onCancel` | Question fermée Non / Oui |
 | `IngredientPickerModal` | `open`, `existingIngredientIds`, `onConfirm`, `onCancel` | Recherche d'un ingrédient + quantité |
 | `MealPickerModal` | `open`, `slotDate`, `mealType`, `slot?`, `onClose` | Ajout ou modification d'une entrée du planning (recette ou écart) |
-| `HoldToDeleteButton` | `onConfirm`, `label` | Suppression par appui maintenu de 700 ms |
+| `FavoriteButton` | `name`, `isFavorite`, `onToggle` | Cœur d'un plat en `.icon-button`, `aria-pressed` ; liste des plats et fenêtre du planning |
+| `HoldToDeleteButton` |, `label` | Suppression par appui maintenu de 700 ms |
 
 `IconNumberField` et `DifficultyPicker` sont pour l'instant **locaux** à `RecipeFormScreen.tsx`. Dès qu'un second écran en a besoin, les déplacer dans `src/components/` au lieu de les recopier.
 
@@ -97,6 +98,8 @@ Ces noms datent des recettes mais servent de modèle générique : pour une autr
 - Refus à gauche (rouge), validation à droite (verte), désactivée tant que la saisie est incomplète.
 - Liste de choix : `.picker-results` > `.picker-result-list` > `button.picker-result` (`.selected`, `disabled`), note à droite en `.picker-result-note`.
 - Comportement commun : `if (!open) return null;`, fermeture par Échap, focus sur le champ de recherche à l'ouverture, remise à zéro de l'état à chaque ouverture (comparaison `open !== wasOpen` pendant le rendu, pas dans un effet).
+
+Un résultat de fenêtre suivi d'une action (cœur) : `li.picker-result-row` contient le `button.picker-result` et le bouton d'action, frères.
 
 ## Supprimer : quel geste
 

@@ -756,6 +756,19 @@ body {
   border-bottom: 1px solid color-mix(in srgb, canvasText 10%, transparent);
 }
 
+/* Résultat suivi de son cœur : deux boutons frères, le filet passe sur la ligne. */
+.picker-result-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid color-mix(in srgb, canvasText 10%, transparent);
+}
+
+.picker-result-row .picker-result {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+}
+
 .picker-result.selected {
   background: color-mix(in srgb, #2ecc71 25%, transparent);
   font-weight: 600;

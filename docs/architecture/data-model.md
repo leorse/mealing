@@ -16,7 +16,7 @@ Base Dexie `mealing`, **version 1**, définie dans [db/schema.ts](../../src/db/s
 |---|---|---|---|
 | `userProfile` | `++id` (toujours `1`) | — | Profil unique : mensurations, activité, objectif, répartition des macros |
 | `ingredients` | `id` (uuid) | `name, barcode, category, isCustom` | Aliments ; `source` : `CIQUAL`, `OFF` ou `CUSTOM` |
-| `recipes` | `id` | `name, difficulty, isHealthy` | Recettes maison (`kind: 'RECIPE'`) et plats tout prêts (`kind: 'PREPARED'`) |
+| `recipes` | `id` | `name, difficulty, isHealthy` | Plats maison (`kind: 'RECIPE'`) et plats tout prêts (`kind: 'PREPARED'`) |
 | `recipeIngredients` | `id` | `recipeId, ingredientId` | Lignes d'une recette : ingrédient + `quantityG` |
 | `weekPlans` | `id` | `weekStart` | Une semaine, identifiée par son lundi `AAAA-MM-JJ` |
 | `mealSlots` | `id` | `weekPlanId, slotDate, [slotDate+mealType]` | Une entrée du planning |
@@ -28,6 +28,7 @@ Base Dexie `mealing`, **version 1**, définie dans [db/schema.ts](../../src/db/s
 ## Points à connaître
 
 - **`Recipe.kind`** change tout : `RECIPE` calcule ses valeurs depuis ses ingrédients et porte `prepTimeMin`, `cookTimeMin`, `difficulty`, `isHealthy` ; `PREPARED` n'a pas d'ingrédients et stocke `caloriesPerServing` (obligatoire) et les macros par portion, saisis à la main.
+- **`Recipe.isFavorite`** (non indexé, absent = non favori) : basculé par `recipeRepository.setFavorite`, qui ne touche pas `updatedAt`. Hors de `RecipeInput`, il survit à l'enregistrement du formulaire.
 - **`MealSlot`** : plusieurs entrées possibles pour un même jour et un même `mealType`. `freeLabel` porte le nom affiché (y compris pour une recette), `caloriesOverride` porte les calories retenues, `isDeviation` distingue un écart d'une recette, `includeInShopping` (non indexé, absent = faux) marque le plat pour les courses, et `shoppingItemStates` (non indexé) porte l'état de ses articles dans la liste : clé = identifiant d'ingrédient (ou de la recette pour un plat tout prêt), valeur `'OFF'` (grisé) ou `'DELETED'` ; un article absent est actif.
 - **Identifiants** : `crypto.randomUUID()` généré par le repository, jamais par l'écran.
 - **Horodatages** (`createdAt`, `updatedAt`, `consumedAt`) : instants, donc `new Date().toISOString()`. Les **jours civils** (`slotDate`, `weekStart`, `logDate`) suivent la [convention de dates](domain-rules.md#dates).

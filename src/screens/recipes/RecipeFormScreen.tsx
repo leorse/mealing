@@ -190,7 +190,7 @@ export default function RecipeFormScreen() {
 
   return (
     <form className="screen" onSubmit={handleSubmit}>
-      <h1>{isEdit ? 'Modifier' : (kind === 'PREPARED' ? 'Nouveau plat tout prêt' : 'Nouvelle recette')}</h1>
+      <h1>{isEdit ? 'Modifier' : (kind === 'PREPARED' ? 'Nouveau plat tout prêt' : 'Nouveau plat maison')}</h1>
 
       {!isEdit && (
         <div className="kind-toggle">
@@ -198,8 +198,8 @@ export default function RecipeFormScreen() {
             type="button"
             className={kind === 'RECIPE' ? 'active' : ''}
             onClick={() => setKind('RECIPE')}
-            aria-label="Recette maison"
-            title="Recette maison"
+            aria-label="Plat maison"
+            title="Plat maison"
           >
             <img src="/icons/recipes/recipe.svg" alt="" className="dark-invert" />
           </button>

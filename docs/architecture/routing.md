@@ -43,7 +43,7 @@ Un écran « À venir » est une coquille : `<div className="screen"><h1>Titre</
 
 ## Barre de navigation
 
-Six entrées, définies par `NAV_ITEMS` dans [app/AppLayout.tsx](../../src/app/AppLayout.tsx) : Accueil, Planning, Recettes, Courses, Suivi, Réglages. Icône seule, libellé en `aria-label`, entrée active à pleine opacité. Détail visuel dans [layout.md](../design/layout.md).
+Six entrées, définies par `NAV_ITEMS` dans [app/AppLayout.tsx](../../src/app/AppLayout.tsx) : Accueil, Planning, Plats (route `/recipes`), Courses, Suivi, Réglages. Icône seule, libellé en `aria-label`, entrée active à pleine opacité. Détail visuel dans [layout.md](../design/layout.md).
 
 ## Ajouter un écran
 

@@ -17,7 +17,7 @@ Servies depuis `public/icons/`, référencées par chemin absolu (`/icons/common
 | Dossier | Contenu | Fichiers |
 |---|---|---|
 | `nav/` | Barre de navigation | `home`, `planning`, `legume` (recettes), `caddie` (courses), `suivi`, `settings` |
-| `common/` | Actions génériques | `add`, `edit`, `save`, `trash`, `chevron` |
+| `common/` | Actions génériques | `add`, `edit`, `save`, `trash`, `chevron`, `heart`, `heart-filled` |
 | `recipes/` | Domaine recettes | `recipe`, `ready-to-eat`, `person` (portions), `preparer` (préparation), `oven` (cuisson), `chef-hat` (difficulté) |
 
 `assets/` contient les originaux et n'est pas servi. Une nouvelle icône va dans `public/icons/<domaine>/`, en minuscules avec tirets ; créer un dossier par nouveau domaine (`shopping/`, `nutrition/`…).
@@ -31,6 +31,7 @@ Servies depuis `public/icons/`, référencées par chemin absolu (`/icons/common
 | Enregistrer | `common/save.svg` |
 | Supprimer, retirer | `common/trash.svg` |
 | Courses | `nav/caddie.svg` |
+| Favori | `common/heart.svg` (contour, `currentColor`) / `common/heart-filled.svg` (plein, `#e74c3c`) — via `FavoriteButton` |
 | Déplier, replier | `common/chevron.svg` (pointe en bas, retournée à l'ouverture) |
 | Portions | `recipes/person.svg` |
 | Temps de préparation | `recipes/preparer.svg` |

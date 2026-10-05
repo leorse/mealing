@@ -21,6 +21,12 @@ export async function getIngredientsForRecipes(recipeIds: string[]): Promise<Rec
   return db.recipeIngredients.where('recipeId').anyOf(recipeIds).toArray();
 }
 
+/** Marquer un favori n'est pas modifier le plat : updatedAt reste inchangé.
+ *  Hors de RecipeInput, le favori survit donc à l'enregistrement du formulaire. */
+export async function setFavorite(id: string, isFavorite: boolean): Promise<void> {
+  await db.recipes.update(id, { isFavorite });
+}
+
 export interface RecipeInput {
   name: string;
   description?: string;

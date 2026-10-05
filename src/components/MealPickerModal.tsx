@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { list as listRecipes, getIngredients } from '../db/repositories/recipeRepository';
+import { list as listRecipes, getIngredients, setFavorite } from '../db/repositories/recipeRepository';
 import { getById as getIngredientById } from '../db/repositories/ingredientRepository';
 import { computeRecipeNutrition, perServing } from '../services/nutrition';
 import { addSlotForWeek, updateSlot } from '../db/repositories/planningRepository';
 import { startOfWeekIso, fromIsoDate } from '../utils/date';
+import FavoriteButton from './FavoriteButton';
 import type { MealSlot, Recipe } from '../db/schema';
 
 type Mode = 'RECIPE' | 'DEVIATION';
@@ -15,6 +16,13 @@ interface MealPickerModalProps {
   /** Entrée à modifier ; absent pour un ajout. */
   slot?: MealSlot;
   onClose: () => void;
+}
+
+/** Favoris d'abord, puis les autres, chaque groupe par ordre alphabétique. */
+function favoritesFirst(recipes: Recipe[]): Recipe[] {
+  return [...recipes].sort(
+    (a, b) => Number(Boolean(b.isFavorite)) - Number(Boolean(a.isFavorite)) || a.name.localeCompare(b.name, 'fr'),
+  );
 }
 
 /** Calories par portion : lues pour un plat tout prêt, recalculées pour une recette maison. */
@@ -61,7 +69,8 @@ export default function MealPickerModal({ open, slotDate, mealType, slot, onClos
 
   useEffect(() => {
     if (!open) return;
-    listRecipes().then(setRecipes);
+    // L'ordre est figé à l'ouverture : un plat marqué pendant le choix ne saute pas sous le doigt.
+    listRecipes().then((found) => setRecipes(favoritesFirst(found)));
   }, [open]);
 
   useEffect(() => {
@@ -83,6 +92,12 @@ export default function MealPickerModal({ open, slotDate, mealType, slot, onClos
   const caloriesIsValid = calories !== '' && calories > 0;
   const canConfirm =
     caloriesIsValid && (mode === 'RECIPE' ? selectedId !== null : label.trim().length > 0);
+
+  function toggleFavorite(recipe: Recipe) {
+    const isFavorite = !recipe.isFavorite;
+    void setFavorite(recipe.id!, isFavorite);
+    setRecipes(recipes.map((r) => (r.id === recipe.id ? { ...r, isFavorite } : r)));
+  }
 
   function chooseRecipe(recipe: Recipe) {
     setSelectedId(recipe.id!);
@@ -127,7 +142,7 @@ export default function MealPickerModal({ open, slotDate, mealType, slot, onClos
             className={mode === 'RECIPE' ? 'active' : ''}
             onClick={() => setMode('RECIPE')}
           >
-            Recette
+            Plat
           </button>
           <button
             type="button"
@@ -143,21 +158,21 @@ export default function MealPickerModal({ open, slotDate, mealType, slot, onClos
             <input
               ref={searchRef}
               className="picker-search"
-              placeholder="Rechercher une recette…"
+              placeholder="Rechercher un plat…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
 
             <div className="picker-results">
               {recipes.length === 0 ? (
-                <p className="empty-state">Aucune recette enregistrée — créez-en une dans l'onglet Recettes.</p>
+                <p className="empty-state">Aucun plat enregistré — créez-en un dans l'onglet Plats.</p>
               ) : (
-                filtered.length === 0 && <p className="empty-state">Aucune recette ne correspond.</p>
+                filtered.length === 0 && <p className="empty-state">Aucun plat ne correspond.</p>
               )}
 
               <ul className="picker-result-list">
                 {filtered.map((recipe) => (
-                  <li key={recipe.id}>
+                  <li key={recipe.id} className="picker-result-row">
                     <button
                       type="button"
                       className={`picker-result ${selectedId === recipe.id ? 'selected' : ''}`}
@@ -165,9 +180,14 @@ export default function MealPickerModal({ open, slotDate, mealType, slot, onClos
                     >
                       <span className="picker-result-name">{recipe.name}</span>
                       <span className="picker-result-note">
-                        {recipe.kind === 'PREPARED' ? 'tout prêt' : 'recette'}
+                        {recipe.kind === 'PREPARED' ? 'tout prêt' : 'maison'}
                       </span>
                     </button>
+                    <FavoriteButton
+                      name={recipe.name}
+                      isFavorite={Boolean(recipe.isFavorite)}
+                      onToggle={() => toggleFavorite(recipe)}
+                    />
                   </li>
                 ))}
               </ul>

@@ -50,6 +50,7 @@ export interface Recipe {
   cookTimeMin?: number;
   difficulty?: 'EASY' | 'MEDIUM' | 'HARD'; // sans objet pour un plat tout prêt (kind: 'PREPARED')
   isHealthy?: boolean;
+  isFavorite?: boolean; // non indexé, donc sans migration : absent = non favori
   photoBlob?: Blob;
   tags?: string[];
   // Renseigné uniquement si kind === 'PREPARED' — valeurs nutritionnelles par portion, saisies à la main
