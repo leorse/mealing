@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getById as getIngredientById } from '../../db/repositories/ingredientRepository';
-import IngredientPickerModal from '../../components/IngredientPickerModal';
+import IngredientPickerModal, { type IngredientChoice } from '../../components/IngredientPickerModal';
 import MaskIcon from '../../components/MaskIcon';
 import {
   create,
@@ -11,11 +11,14 @@ import {
   type RecipeIngredientInput,
 } from '../../db/repositories/recipeRepository';
 import { computeRecipeNutrition, perServing, mainIngredient, isHealthyRecipe } from '../../services/nutrition';
+import { formatGrams, gramsFor, hasPortion, pluralizeUnit } from '../../services/portions';
 import type { Ingredient, Recipe } from '../../db/schema';
 
 interface DraftIngredient {
   ingredient: Ingredient;
   quantityG: number;
+  /** Présent quand la ligne se compte en unités de l'aliment ; quantityG en découle. */
+  unitCount?: number;
 }
 
 function IconNumberField({
@@ -113,9 +116,9 @@ export default function RecipeFormScreen() {
       if (recipe.kind === 'RECIPE') {
         const recipeIngredients = await getIngredients(id);
         const draft = await Promise.all(
-          recipeIngredients.map(async (ri) => {
+          recipeIngredients.map(async (ri): Promise<DraftIngredient | null> => {
             const ingredient = await getIngredientById(ri.ingredientId);
-            return ingredient ? { ingredient, quantityG: ri.quantityG } : null;
+            return ingredient ? { ingredient, quantityG: ri.quantityG, unitCount: ri.unitCount } : null;
           }),
         );
         setIngredients(draft.filter((d): d is DraftIngredient => d !== null));
@@ -123,14 +126,34 @@ export default function RecipeFormScreen() {
     })();
   }, [id]);
 
-  function addIngredient({ ingredient, quantityG }: { ingredient: Ingredient; quantityG: number }) {
+  function addIngredient({ ingredient, quantityG, unitCount }: IngredientChoice) {
     if (ingredients.some((d) => d.ingredient.id === ingredient.id)) return;
-    setIngredients([...ingredients, { ingredient, quantityG }]);
+    setIngredients([...ingredients, { ingredient, quantityG, unitCount }]);
     setIsPickerOpen(false);
   }
 
-  function updateQuantity(ingredientId: string, quantityG: number) {
-    setIngredients(ingredients.map((d) => (d.ingredient.id === ingredientId ? { ...d, quantityG } : d)));
+  /** La valeur saisie est un nombre d'unités ou des grammes, selon le mode de la ligne. */
+  function updateQuantity(ingredientId: string, value: number) {
+    setIngredients(
+      ingredients.map((d) => {
+        if (d.ingredient.id !== ingredientId) return d;
+        return d.unitCount !== undefined && hasPortion(d.ingredient)
+          ? { ...d, unitCount: value, quantityG: gramsFor(value, d.ingredient.portionG) }
+          : { ...d, quantityG: value };
+      }),
+    );
+  }
+
+  /** Unité corrigée dans la fenêtre : une ligne déjà présente prend aussitôt le nouveau poids. */
+  function refreshIngredient(updated: Ingredient) {
+    setIngredients(
+      ingredients.map((d) => {
+        if (d.ingredient.id !== updated.id) return d;
+        return d.unitCount !== undefined && hasPortion(updated)
+          ? { ...d, ingredient: updated, quantityG: gramsFor(d.unitCount, updated.portionG) }
+          : { ...d, ingredient: updated };
+      }),
+    );
   }
 
   function removeIngredient(ingredientId: string) {
@@ -177,7 +200,7 @@ export default function RecipeFormScreen() {
 
     const ingredientInputs: RecipeIngredientInput[] = isPrepared
       ? []
-      : ingredients.map((d) => ({ ingredientId: d.ingredient.id!, quantityG: d.quantityG }));
+      : ingredients.map((d) => ({ ingredientId: d.ingredient.id!, quantityG: d.quantityG, unitCount: d.unitCount }));
 
     if (isEdit && id) {
       await update(id, recipeInput, ingredientInputs);
@@ -309,21 +332,28 @@ export default function RecipeFormScreen() {
             {ingredients.length === 0 && <p className="empty-state">Aucun ingrédient ajouté.</p>}
 
             <ul className="ingredient-list">
-              {ingredients.map(({ ingredient, quantityG }) => (
+              {ingredients.map(({ ingredient, quantityG, unitCount }) => {
+                const isCounting = unitCount !== undefined && hasPortion(ingredient);
+                return (
                 <li key={ingredient.id} className="ingredient-row">
-                  <span className="ingredient-row-name">{ingredient.name}</span>
+                  <span className="ingredient-row-name">
+                    {ingredient.name}
+                    {isCounting && <span className="quantity-note"> · {formatGrams(quantityG)}</span>}
+                  </span>
                   <input
                     type="number"
                     min={0}
-                    value={quantityG}
+                    step={isCounting ? 0.5 : 1}
+                    value={isCounting ? unitCount : quantityG}
                     onChange={(e) => updateQuantity(ingredient.id!, Number(e.target.value))}
                   />
-                  <span>g</span>
+                  <span>{isCounting ? pluralizeUnit(ingredient.portionLabel, unitCount) : 'g'}</span>
                   <button type="button" className="icon-button" onClick={() => removeIngredient(ingredient.id!)} aria-label="Retirer">
                     <MaskIcon src="/icons/common/trash.svg" color="#e74c3c" />
                   </button>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </fieldset>
 
@@ -331,6 +361,7 @@ export default function RecipeFormScreen() {
             open={isPickerOpen}
             existingIngredientIds={ingredients.map((d) => d.ingredient.id!)}
             onConfirm={addIngredient}
+            onIngredientChange={refreshIngredient}
             onCancel={() => setIsPickerOpen(false)}
           />
         </>

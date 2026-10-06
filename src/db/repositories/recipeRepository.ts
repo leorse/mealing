@@ -46,6 +46,7 @@ export interface RecipeInput {
 export interface RecipeIngredientInput {
   ingredientId: string;
   quantityG: number;
+  unitCount?: number;
   unitLabel?: string;
 }
 

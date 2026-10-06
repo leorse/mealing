@@ -101,6 +101,8 @@ Ces noms datent des recettes mais servent de modèle générique : pour une autr
 
 Un résultat de fenêtre suivi d'une action (cœur) : `li.picker-result-row` contient le `button.picker-result` et le bouton d'action, frères.
 
+Zone de quantité de la fenêtre d'ajout d'ingrédient : `.mode-toggle` (unité / g), champ, `.quantity-note` pour l'équivalent en grammes, puis `.picker-unit` (rappel « 1 saucisse = 130 g » et crayon) ou `.picker-unit-editor` (nom, poids, validation par icône). `.quantity-note` sert aussi dans une ligne `.ingredient-row` comptée en unités.
+
 ## Supprimer : quel geste
 
 | Contexte | Geste |

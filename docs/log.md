@@ -9,6 +9,8 @@ timestamp: 2026-10-04T00:00:00Z
 
 Une ligne par changement, la plus récente en haut.
 
+- **2026-10-06** — Saisie à l'unité : `unitCount`, `setPortion`, `ensureCiqualPortions`, `services/portions.ts`, classes `.quantity-note`, `.picker-unit`, `.picker-unit-editor`.
+- **2026-10-06** — Portions estimées : colonnes `portion_g` / `portion_label` dans `ciqual.sql`, champs `portionG` / `portionLabel` sur `Ingredient`.
 - **2026-10-05** — Recherche d'ingrédient : règles de classement dans domain-rules, `services/ingredientSearch.ts`.
 - **2026-10-05** — Plats favoris et vocabulaire : « plat » à l'écran (règle dans conventions), `Recipe.isFavorite`, `setFavorite`, composant `FavoriteButton`, icônes `heart` / `heart-filled`, classe `.picker-result-row`.
 - **2026-10-04** — Liste de courses : règles métier, champ `shoppingItemStates`, nouvelles fonctions du repository de planning, classes `.shopping-*`, `.shop-toggle`, `.button-primary--danger`, icône `chevron`.

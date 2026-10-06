@@ -800,6 +800,40 @@ body {
   font: inherit;
 }
 
+/* Équivalent en grammes d'une quantité comptée en unités, et rappel du poids d'une unité. */
+.quantity-note {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.picker-unit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+/* Correction de l'unité : nom et poids côte à côte, validation par icône. */
+.picker-unit-editor {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.picker-unit-editor .picker-quantity {
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-unit-editor input {
+  width: 100%;
+}
+
+.picker-unit-editor .icon-button:disabled {
+  opacity: 0.35;
+}
+
 /* Sélecteur Recette / Écart de la fenêtre d'ajout au planning. */
 .mode-toggle {
   display: flex;

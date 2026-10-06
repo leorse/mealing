@@ -69,6 +69,16 @@ Comportement spécifié dans la capacité OpenSpec `shopping-list`. Calcul dans 
 - **Tout supprimer** : éteint toutes les pastilles après confirmation, sans supprimer aucun repas.
 - Agir sur un ingrédient depuis sa ligne groupée vise toutes ses occurrences ; depuis le détail déplié ou la vue par plat, une seule.
 
+## Saisie à l'unité
+
+Comportement spécifié dans la capacité OpenSpec `ingredient-portions`. Conversions et mise en forme dans [services/portions.ts](../../src/services/portions.ts).
+
+- **Les grammes restent la vérité** : nutrition, planning et liste de courses ne lisent que `quantityG`. Le nombre d'unités (`unitCount`) s'y ajoute pour la saisie et l'affichage.
+- **Mode par défaut** dans la fenêtre d'ajout : unités (1) si l'aliment a une unité propre (`hasOwnUnit` : libellé autre que `portion`), sinon grammes (100).
+- **Affichage** par `formatQuantity` : « 3 saucisses (390 g) » ou « 390 g ». Pluriel à partir de 2 ; libellé invariable s'il est abrégé, composé, ou finit par s, x, z ; `+x` après `au`.
+- **Corriger une unité** (`setPortion`) : les plats comptés en unités gardent leur nombre et prennent le nouveau poids ; ceux saisis en grammes ne bougent pas. `isHealthy` n'est recalculé qu'au prochain enregistrement du plat.
+- Les portions fournies avec Ciqual sont des **estimations**, pas des données Ciqual.
+
 ## Recherche d'ingrédient
 
 Comportement spécifié dans la capacité OpenSpec `ingredient-search`. Classement dans [services/ingredientSearch.ts](../../src/services/ingredientSearch.ts) (fonctions pures), appelé par `ingredientRepository.search`.

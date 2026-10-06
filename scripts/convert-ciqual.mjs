@@ -14,7 +14,7 @@ const COLUMNS = [
   'id', 'name', 'brand', 'barcode', 'category', 'calories_100g', 'proteins_100g',
   'carbs_100g', 'sugars_100g', 'fat_100g', 'saturated_fat_100g', 'fiber_100g',
   'salt_100g', 'glycemic_index', 'nutri_score', 'off_id', 'is_custom', 'source',
-  'user_id', 'created_at',
+  'user_id', 'created_at', 'portion_g', 'portion_label',
 ];
 
 /** Tokenize une liste de valeurs SQL (VALUES(...)) en respectant les quotes et '' échappé. */
@@ -73,6 +73,8 @@ function toIngredient(row) {
     salt100g: row.salt_100g ?? undefined,
     glycemicIndex: row.glycemic_index ?? undefined,
     nutriScore: row.nutri_score ?? undefined,
+    portionG: row.portion_g ?? undefined,
+    portionLabel: row.portion_label ?? undefined,
     isCustom,
     source: 'CIQUAL',
     createdAt: new Date(row.created_at.replace(' ', 'T') + 'Z').toISOString(),

@@ -37,6 +37,26 @@ export async function update(id: string, data: Partial<Ingredient>): Promise<voi
   await db.ingredients.update(id, data);
 }
 
+/**
+ * Enregistre l'unité d'un aliment. Les plats qui le comptent en unités gardent leur nombre
+ * et prennent le nouveau poids ; les lignes saisies en grammes n'ont pas d'unitCount et ne bougent pas.
+ */
+export async function setPortion(
+  id: string,
+  portion: { portionG: number; portionLabel: string },
+): Promise<Ingredient | undefined> {
+  return db.transaction('rw', db.ingredients, db.recipeIngredients, async () => {
+    await db.ingredients.update(id, portion);
+    await db.recipeIngredients
+      .where('ingredientId')
+      .equals(id)
+      .modify((line) => {
+        if (line.unitCount !== undefined) line.quantityG = line.unitCount * portion.portionG;
+      });
+    return db.ingredients.get(id);
+  });
+}
+
 export async function remove(id: string): Promise<void> {
   const ingredient = await db.ingredients.get(id);
   if (ingredient && !ingredient.isCustom) {

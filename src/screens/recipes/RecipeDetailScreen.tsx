@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { getById, getIngredients, remove } from '../../db/repositories/recipeRepository';
 import { getById as getIngredientById } from '../../db/repositories/ingredientRepository';
 import { computeRecipeNutrition, perServing } from '../../services/nutrition';
+import { formatQuantity } from '../../services/portions';
 import DifficultyIcon from '../../components/DifficultyIcon';
 import MaskIcon from '../../components/MaskIcon';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -27,10 +28,10 @@ export default function RecipeDetailScreen() {
     const items = await Promise.all(
       recipeIngredients.map(async (ri) => {
         const ingredient = await getIngredientById(ri.ingredientId);
-        return ingredient ? { ingredient, quantityG: ri.quantityG } : null;
+        return ingredient ? { ingredient, quantityG: ri.quantityG, unitCount: ri.unitCount } : null;
       }),
     );
-    const resolvedItems = items.filter((i): i is { ingredient: NonNullable<typeof i>['ingredient']; quantityG: number } => i !== null);
+    const resolvedItems = items.filter((i): i is NonNullable<typeof i> => i !== null);
     const totals = computeRecipeNutrition(resolvedItems);
     const per = perServing(totals, recipe.servings);
     return { recipe, items: resolvedItems, totals, per };
@@ -68,9 +69,9 @@ export default function RecipeDetailScreen() {
         <section className="card">
           <p className="card-label">Ingrédients</p>
           <ul className="ingredient-list">
-            {items.map(({ ingredient, quantityG }) => (
+            {items.map(({ ingredient, quantityG, unitCount }) => (
               <li key={ingredient.id}>
-                {ingredient.name} — {quantityG} g
+                {ingredient.name} — {formatQuantity({ quantityG, unitCount }, ingredient)}
               </li>
             ))}
           </ul>

@@ -33,6 +33,9 @@ export interface Ingredient {
   salt100g?: number;
   glycemicIndex?: number;
   nutriScore?: 'A' | 'B' | 'C' | 'D' | 'E';
+  // Poids estimé d'une portion ou d'une unité usuelle (« 1 saucisse = 130 g ») : une moyenne indicative.
+  portionG?: number;
+  portionLabel?: string;
   allergens?: string[];
   offId?: string; // Open Food Facts ID
   isCustom: boolean;
@@ -67,6 +70,9 @@ export interface RecipeIngredient {
   recipeId: string;
   ingredientId: string;
   quantityG: number;
+  // Présent quand la ligne a été saisie en unités de l'aliment. Non indexé, donc sans migration.
+  // quantityG reste la vérité des calculs et vaut alors unitCount × portionG de l'aliment.
+  unitCount?: number;
   unitLabel?: string;
 }
 
