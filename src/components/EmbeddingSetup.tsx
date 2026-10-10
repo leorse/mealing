@@ -5,7 +5,7 @@ import {
   embeddingErrorMessage,
   prepareEmbedding,
 } from '../services/embedding/embeddingClient';
-import { MODEL_APPROX_BYTES, type EmbeddingErrorCode, type EmbeddingProgress } from '../services/embedding/types';
+import { MODEL_APPROX_BYTES, type EmbeddingProgress } from '../services/embedding/types';
 
 interface EmbeddingSetupProps {
   /** Le modèle est téléchargé et chargé : la recherche intelligente est utilisable. */
@@ -26,24 +26,24 @@ const STAGE_LABELS: Record<EmbeddingProgress['stage'], string> = {
 export default function EmbeddingSetup({ onReady }: EmbeddingSetupProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState<EmbeddingProgress | null>(null);
-  const [errorCode, setErrorCode] = useState<EmbeddingErrorCode | null>(null);
+  const [failure, setFailure] = useState<EmbeddingError | null>(null);
 
   // Le téléchargement doit survivre aux rendus : le composant tient le worker tant qu'il est affiché.
   useEffect(() => acquireEmbedding(), []);
 
   async function start() {
     if (!navigator.onLine) {
-      setErrorCode('OFFLINE');
+      setFailure(new EmbeddingError('OFFLINE', 'Le navigateur se déclare hors ligne (navigator.onLine).'));
       return;
     }
     setIsRunning(true);
-    setErrorCode(null);
+    setFailure(null);
     setProgress(null);
     try {
       await prepareEmbedding(setProgress);
       onReady();
     } catch (error) {
-      setErrorCode(error instanceof EmbeddingError ? error.code : 'UNSUPPORTED');
+      setFailure(error instanceof EmbeddingError ? error : new EmbeddingError('UNSUPPORTED', String(error)));
     } finally {
       setIsRunning(false);
     }
@@ -79,16 +79,24 @@ export default function EmbeddingSetup({ onReady }: EmbeddingSetupProps) {
         </>
       )}
 
-      {errorCode && (
-        <p className="quantity-note" role="alert">
-          {embeddingErrorMessage(errorCode)}
-        </p>
+      {failure && (
+        <>
+          <p className="quantity-note" role="alert">
+            {embeddingErrorMessage(failure.code)}
+          </p>
+          {failure.detail && (
+            <details className="quantity-note">
+              <summary>Détail technique</summary>
+              <p className="error-detail">{failure.detail}</p>
+            </details>
+          )}
+        </>
       )}
 
-      {!isRunning && errorCode !== 'UNSUPPORTED' && (
+      {!isRunning && failure?.code !== 'UNSUPPORTED' && (
         <div className="button-row">
           <button type="button" onClick={start}>
-            {errorCode ? 'Réessayer' : `Télécharger (≈ ${megabytes(MODEL_APPROX_BYTES)})`}
+            {failure ? 'Réessayer' : `Télécharger (≈ ${megabytes(MODEL_APPROX_BYTES)})`}
           </button>
         </div>
       )}

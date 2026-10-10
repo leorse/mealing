@@ -51,6 +51,8 @@ type Phase = 'INPUT' | 'SETUP' | 'ANALYZING' | 'RESULT';
 interface Failure {
   message: string;
   needsSettings: boolean;
+  /** Détail technique d'un échec de la recherche intelligente. */
+  detail?: string;
 }
 
 function failureOf(code: DishErrorCode): Failure {
@@ -131,7 +133,9 @@ export default function DishFromTextScreen() {
       if (controller.signal.aborted) return;
       checkpointRef.current = error instanceof ChoiceStepError ? error.checkpoint : null;
       if (error instanceof AiError) setFailure(failureOf(error.code));
-      else if (error instanceof EmbeddingError) setFailure({ message: embeddingErrorMessage(error.code), needsSettings: false });
+      else if (error instanceof EmbeddingError) {
+        setFailure({ message: embeddingErrorMessage(error.code), needsSettings: false, detail: error.detail });
+      }
       else setFailure(failureOf('INVALID_RESPONSE'));
       setPhase('INPUT');
     }
@@ -446,6 +450,12 @@ export default function DishFromTextScreen() {
           <p className="quantity-note" role="alert">
             {failure.message}
           </p>
+          {failure.detail && (
+            <details className="quantity-note">
+              <summary>Détail technique</summary>
+              <p className="error-detail">{failure.detail}</p>
+            </details>
+          )}
           {failure.needsSettings && (
             <div className="button-row">
               <Link to="/settings">Ouvrir les Réglages</Link>

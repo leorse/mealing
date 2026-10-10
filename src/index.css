@@ -1245,3 +1245,12 @@ body {
 .button-primary:disabled {
   opacity: 0.5;
 }
+
+/* Détail technique d'un échec, dans un <details> : texte brut, sélectionnable pour être copié. */
+.error-detail {
+  margin: 0.4rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  font-family: monospace;
+}

@@ -45,7 +45,7 @@ export type EmbeddingRequestMessage = EmbeddingRequest & { requestId: number };
 export type EmbeddingResponseMessage =
   | { requestId: number; type: 'progress'; progress: EmbeddingProgress }
   | { requestId: number; type: 'result'; value: unknown }
-  | { requestId: number; type: 'error'; code: EmbeddingErrorCode };
+  | { requestId: number; type: 'error'; code: EmbeddingErrorCode; detail: string };
 
 /** Taille annoncée avant le téléchargement ; la progression affiche ensuite les octets réels. */
 export const MODEL_APPROX_BYTES = 120 * 1024 * 1024;

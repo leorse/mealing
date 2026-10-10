@@ -11,18 +11,21 @@ import type {
 
 export class EmbeddingError extends Error {
   code: EmbeddingErrorCode;
+  /** Étape, erreur d'origine et état de l'appareil : ce que le message court ne dit pas. */
+  detail: string;
 
-  constructor(code: EmbeddingErrorCode) {
+  constructor(code: EmbeddingErrorCode, detail = '') {
     super(code);
     this.code = code;
+    this.detail = detail;
   }
 }
 
 const ERROR_MESSAGES: Record<EmbeddingErrorCode, string> = {
-  OFFLINE: 'Le téléchargement nécessite une connexion. Vérifie le réseau puis réessaie.',
+  OFFLINE: 'La préparation nécessite une connexion. Vérifie le réseau puis réessaie.',
   QUOTA: "Il n'y a pas assez de place sur cet appareil : la recherche intelligente demande environ 120 Mo libres.",
   UNSUPPORTED: "La recherche intelligente n'est pas disponible sur cet appareil.",
-  INTERRUPTED: 'Le téléchargement a été interrompu. Réessaie : les fichiers déjà reçus ne seront pas retéléchargés.',
+  INTERRUPTED: "Le téléchargement n'a pas abouti. Réessaie : les fichiers déjà reçus ne seront pas retéléchargés.",
 };
 
 export function embeddingErrorMessage(code: EmbeddingErrorCode): string {
@@ -51,11 +54,12 @@ function getWorker(): Worker {
       return;
     }
     pending.delete(data.requestId);
-    if (data.type === 'error') request.reject(new EmbeddingError(data.code));
+    if (data.type === 'error') request.reject(new EmbeddingError(data.code, data.detail));
     else request.resolve(data.value);
   };
-  worker.onerror = () => {
-    for (const request of pending.values()) request.reject(new EmbeddingError('UNSUPPORTED'));
+  worker.onerror = (event) => {
+    const detail = `Le worker n'a pas pu démarrer ou s'est arrêté : ${event.message || 'aucun message'}`;
+    for (const request of pending.values()) request.reject(new EmbeddingError('UNSUPPORTED', detail));
     pending.clear();
   };
   return worker;
