@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getById as getIngredientById } from '../../db/repositories/ingredientRepository';
 import IngredientPickerModal, { type IngredientChoice } from '../../components/IngredientPickerModal';
+import IngredientNutritionModal from '../../components/IngredientNutritionModal';
 import MaskIcon from '../../components/MaskIcon';
 import {
   create,
@@ -10,7 +11,13 @@ import {
   getIngredients,
   type RecipeIngredientInput,
 } from '../../db/repositories/recipeRepository';
-import { computeRecipeNutrition, perServing, mainIngredient, isHealthyRecipe } from '../../services/nutrition';
+import {
+  computeRecipeNutrition,
+  perServing,
+  mainIngredient,
+  isHealthyRecipe,
+  lacksNutrition,
+} from '../../services/nutrition';
 import { formatGrams, gramsFor, hasPortion, pluralizeUnit } from '../../services/portions';
 import type { Ingredient, Recipe } from '../../db/schema';
 
@@ -95,6 +102,8 @@ export default function RecipeFormScreen() {
   const [fatPerServing, setFatPerServing] = useState<number | ''>('');
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  // Aliment personnel dont on corrige les valeurs nutritionnelles ; null = fenêtre fermée.
+  const [nutritionTarget, setNutritionTarget] = useState<Ingredient | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -339,6 +348,9 @@ export default function RecipeFormScreen() {
                   <span className="ingredient-row-name">
                     {ingredient.name}
                     {isCounting && <span className="quantity-note"> · {formatGrams(quantityG)}</span>}
+                    {lacksNutrition(ingredient) && (
+                      <span className="quantity-note"> · valeurs nutritionnelles non renseignées</span>
+                    )}
                   </span>
                   <input
                     type="number"
@@ -348,6 +360,17 @@ export default function RecipeFormScreen() {
                     onChange={(e) => updateQuantity(ingredient.id!, Number(e.target.value))}
                   />
                   <span>{isCounting ? pluralizeUnit(ingredient.portionLabel, unitCount) : 'g'}</span>
+                  {ingredient.isCustom && (
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => setNutritionTarget(ingredient)}
+                      aria-label="Corriger les valeurs nutritionnelles"
+                      title="Corriger les valeurs nutritionnelles"
+                    >
+                      <MaskIcon src="/icons/common/edit.svg" color="currentColor" />
+                    </button>
+                  )}
                   <button type="button" className="icon-button" onClick={() => removeIngredient(ingredient.id!)} aria-label="Retirer">
                     <MaskIcon src="/icons/common/trash.svg" color="#e74c3c" />
                   </button>
@@ -363,6 +386,15 @@ export default function RecipeFormScreen() {
             onConfirm={addIngredient}
             onIngredientChange={refreshIngredient}
             onCancel={() => setIsPickerOpen(false)}
+          />
+
+          <IngredientNutritionModal
+            ingredient={nutritionTarget}
+            onSaved={(updated) => {
+              refreshIngredient(updated);
+              setNutritionTarget(null);
+            }}
+            onCancel={() => setNutritionTarget(null)}
           />
         </>
       )}

@@ -136,6 +136,54 @@ export function mainIngredient(items: RecipeNutritionItem[]): Ingredient | undef
   )?.ingredient;
 }
 
+/** Saisie des valeurs pour 100 g d'un aliment personnel ; un champ vide vaut 0. */
+export interface Per100gDraft {
+  calories: number | '';
+  proteins: number | '';
+  carbs: number | '';
+  fat: number | '';
+}
+
+export type Per100gValues = Required<Pick<Ingredient, 'calories100g' | 'proteins100g' | 'carbs100g' | 'fat100g'>>;
+
+export const EMPTY_PER_100G: Per100gDraft = { calories: 0, proteins: 0, carbs: 0, fat: 0 };
+
+export function per100gDraftOf(ingredient: Ingredient): Per100gDraft {
+  return {
+    calories: ingredient.calories100g ?? 0,
+    proteins: ingredient.proteins100g ?? 0,
+    carbs: ingredient.carbs100g ?? 0,
+    fat: ingredient.fat100g ?? 0,
+  };
+}
+
+export function isPer100gDraftValid(draft: Per100gDraft): boolean {
+  return Object.values(draft).every((value) => value === '' || value >= 0);
+}
+
+export function per100gFromDraft(draft: Per100gDraft): Per100gValues {
+  return {
+    calories100g: draft.calories || 0,
+    proteins100g: draft.proteins || 0,
+    carbs100g: draft.carbs || 0,
+    fat100g: draft.fat || 0,
+  };
+}
+
+/**
+ * Aliment personnel dont aucune valeur n'est renseignée : il compte pour zéro dans un plat.
+ * Un aliment Ciqual à 0 kcal (eau, sel) n'est pas concerné.
+ */
+export function lacksNutrition(ingredient: Ingredient): boolean {
+  return (
+    ingredient.isCustom &&
+    !ingredient.calories100g &&
+    !ingredient.proteins100g &&
+    !ingredient.carbs100g &&
+    !ingredient.fat100g
+  );
+}
+
 export interface HealthyCriteriaInput {
   caloriesPerServing: number;
   saturatedFatPerServing: number;

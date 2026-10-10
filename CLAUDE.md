@@ -32,14 +32,14 @@ Ce fichier ne contient que l'essentiel. Le détail est dans la base de connaissa
 6. **Icônes en SVG** depuis `public/icons/`, affichées par `MaskIcon` (recolorable) ; tout bouton sans texte porte `aria-label` et `title`.
 7. **Les écrans ne touchent jamais `db` directement** : passer par `src/db/repositories/`. Lecture réactive avec `useLiveQuery`, et une requête lue par `useLiveQuery` n'écrit jamais.
 8. **Un jour civil est une chaîne `AAAA-MM-JJ` locale** : uniquement via [src/utils/date.ts](src/utils/date.ts). Jamais `toISOString().slice(0, 10)` ni `new Date('AAAA-MM-JJ')`.
-9. **Aucune donnée ne quitte l'appareil.** Seul appel réseau autorisé : Open Food Facts.
+9. **Aucune donnée ne quitte l'appareil sans demande explicite.** Deux appels réseau autorisés : Open Food Facts (recherche d'aliments) et 1min.AI (avis de l'IA sur le planning, uniquement sur clic, sans donnée personnelle — voir [domain-rules.md](docs/architecture/domain-rules.md)). Aucune clé d'API dans le code, la doc ni les commits : elle se saisit dans les Réglages.
 10. **Vérifier avant de conclure** : `npm run lint` puis `npm run build`. Il n'y a pas de tests automatisés.
 
 ## Pièges connus
 
 - `spec.md` décrit la **cible** du produit ; `openspec/specs/` décrit le **comportement réellement livré**. En cas de conflit, le code et OpenSpec priment.
 - `_bmad-output/project-context.md` est **obsolète** (ancienne version React Native + Spring Boot) : ne pas s'en servir. `mealing-backend/` et `tools/` sont des restes de cette époque.
-- Dix écrans sont encore des coquilles « À venir » (voir [routing.md](docs/architecture/routing.md)). `framer-motion`, `recharts`, `pdf-lib` et `@zxing/browser` sont installés mais pas encore utilisés.
+- Neuf écrans sont encore des coquilles « À venir » (voir [routing.md](docs/architecture/routing.md)). `framer-motion`, `recharts`, `pdf-lib` et `@zxing/browser` sont installés mais pas encore utilisés.
 - Sur ce poste Windows, Python se lance avec `py`.
 
 ## Tenir la base à jour

@@ -834,6 +834,26 @@ body {
   opacity: 0.35;
 }
 
+/* Saisie libre d'un ingrédient : le formulaire défile si la fenêtre est trop basse. */
+.picker-free {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Valeurs pour 100 g d'un aliment personnel : quatre champs sur deux colonnes. */
+.nutrition-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.nutrition-fields input {
+  width: 100%;
+}
+
 /* Sélecteur Recette / Écart de la fenêtre d'ajout au planning. */
 .mode-toggle {
   display: flex;
@@ -1062,4 +1082,126 @@ body {
 
 .shopping-expand.open {
   transform: rotate(180deg);
+}
+
+/* Avis de l'IA sur le planning. Le nom du jour partage sa ligne avec les deux icônes. */
+.day-column-title {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.day-column-title .day-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+
+.day-column-title .ai-button {
+  padding: 0.2rem;
+}
+
+/* Sans avis à lire, ou sans repas à envoyer : l'icône s'efface. */
+.ai-button:disabled {
+  opacity: 0.3;
+}
+
+/* Requête en cours : l'icône reste pleine et change de couleur en boucle. */
+.ai-button.loading,
+.ai-button.loading:disabled {
+  opacity: 1;
+  animation: ai-thinking 1.5s linear infinite;
+}
+
+@keyframes ai-thinking {
+  0% { color: #2ecc71; }
+  33% { color: #f39c12; }
+  66% { color: #e74c3c; }
+  100% { color: #2ecc71; }
+}
+
+/* Mouvement réduit : l'attente reste signalée, par une couleur fixe. */
+@media (prefers-reduced-motion: reduce) {
+  .ai-button.loading,
+  .ai-button.loading:disabled {
+    animation: none;
+    color: #2ecc71;
+  }
+}
+
+/* Fond d'une journée selon sa note : rouge à 0, orange à 5, vert à 10.
+   Une classe par note plutôt qu'un style en ligne ; teinte légère pour laisser les repas lisibles. */
+.day-column--score-0 {
+  background: color-mix(in srgb, #e74c3c 16%, transparent);
+  border-color: color-mix(in srgb, #e74c3c 45%, transparent);
+}
+
+.day-column--score-1 {
+  background: color-mix(in srgb, color-mix(in srgb, #f39c12 20%, #e74c3c) 16%, transparent);
+  border-color: color-mix(in srgb, color-mix(in srgb, #f39c12 20%, #e74c3c) 45%, transparent);
+}
+
+.day-column--score-2 {
+  background: color-mix(in srgb, color-mix(in srgb, #f39c12 40%, #e74c3c) 16%, transparent);
+  border-color: color-mix(in srgb, color-mix(in srgb, #f39c12 40%, #e74c3c) 45%, transparent);
+}
+
+.day-column--score-3 {
+  background: color-mix(in srgb, color-mix(in srgb, #f39c12 60%, #e74c3c) 16%, transparent);
+  border-color: color-mix(in srgb, color-mix(in srgb, #f39c12 60%, #e74c3c) 45%, transparent);
+}
+
+.day-column--score-4 {
+  background: color-mix(in srgb, color-mix(in srgb, #f39c12 80%, #e74c3c) 16%, transparent);
+  border-color: color-mix(in srgb, color-mix(in srgb, #f39c12 80%, #e74c3c) 45%, transparent);
+}
+
+.day-column--score-5 {
+  background: color-mix(in srgb, #f39c12 16%, transparent);
+  border-color: color-mix(in srgb, #f39c12 45%, transparent);
+}
+
+.day-column--score-6 {
+  background: color-mix(in srgb, color-mix(in srgb, #2ecc71 20%, #f39c12) 16%, transparent);
+  border-color: color-mix(in srgb, color-mix(in srgb, #2ecc71 20%, #f39c12) 45%, transparent);
+}
+
+.day-column--score-7 {
+  background: color-mix(in srgb, color-mix(in srgb, #2ecc71 40%, #f39c12) 16%, transparent);
+  border-color: color-mix(in srgb, color-mix(in srgb, #2ecc71 40%, #f39c12) 45%, transparent);
+}
+
+.day-column--score-8 {
+  background: color-mix(in srgb, color-mix(in srgb, #2ecc71 60%, #f39c12) 16%, transparent);
+  border-color: color-mix(in srgb, color-mix(in srgb, #2ecc71 60%, #f39c12) 45%, transparent);
+}
+
+.day-column--score-9 {
+  background: color-mix(in srgb, color-mix(in srgb, #2ecc71 80%, #f39c12) 16%, transparent);
+  border-color: color-mix(in srgb, color-mix(in srgb, #2ecc71 80%, #f39c12) 45%, transparent);
+}
+
+.day-column--score-10 {
+  background: color-mix(in srgb, #2ecc71 16%, transparent);
+  border-color: color-mix(in srgb, #2ecc71 45%, transparent);
+}
+
+.ai-comment {
+  white-space: pre-line;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.ai-day-score {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  text-transform: capitalize;
 }

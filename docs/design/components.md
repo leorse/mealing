@@ -19,10 +19,13 @@ Dans [src/components/](../../src/components/), export par défaut.
 | `MaskIcon` | `src`, `color`, `size?` (`1.1rem`), `label?` | Icône SVG recolorable. Voir [icons.md](icons.md) |
 | `DifficultyIcon` | `difficulty` | Toque colorée avec libellé accessible (Facile, Moyen, Élaboré) |
 | `ConfirmModal` | `open`, `message`, `onConfirm`, `onCancel` | Question fermée Non / Oui |
-| `IngredientPickerModal` | `open`, `existingIngredientIds`, `onConfirm`, `onCancel` | Recherche d'un ingrédient + quantité |
+| `IngredientPickerModal` | `open`, `existingIngredientIds`, `onConfirm`, `onCancel`, `onIngredientChange?` | Recherche d'un ingrédient + quantité, ou saisie libre (nom, quantité, valeurs pour 100 g) |
+| `IngredientNutritionModal` | `ingredient` (`null` = fermée), `onSaved`, `onCancel` | Correction des valeurs pour 100 g d'un aliment personnel ; écrit l'aliment à la validation |
+| `NutritionFields` | `value`, `onChange` | Les quatre champs calories / protéines / glucides / lipides pour 100 g, dans une fenêtre |
 | `MealPickerModal` | `open`, `slotDate`, `mealType`, `slot?`, `onClose` | Ajout ou modification d'une entrée du planning (recette ou écart) |
 | `FavoriteButton` | `name`, `isFavorite`, `onToggle` | Cœur d'un plat en `.icon-button`, `aria-pressed` ; liste des plats et fenêtre du planning |
-| `HoldToDeleteButton` |, `label` | Suppression par appui maintenu de 700 ms |
+| `AiReviewModal` | `title`, `text`, `score?`, `isOutdated?`, `dayScores?`, `isError?`, `showSettingsLink?`, `onClose` | Lecture d'un avis de l'IA, d'un bilan de semaine ou d'un message d'échec |
+| `HoldToDeleteButton` | `onConfirm`, `label` | Suppression par appui maintenu de 700 ms |
 
 `IconNumberField` et `DifficultyPicker` sont pour l'instant **locaux** à `RecipeFormScreen.tsx`. Dès qu'un second écran en a besoin, les déplacer dans `src/components/` au lieu de les recopier.
 
@@ -102,6 +105,10 @@ Ces noms datent des recettes mais servent de modèle générique : pour une autr
 Un résultat de fenêtre suivi d'une action (cœur) : `li.picker-result-row` contient le `button.picker-result` et le bouton d'action, frères.
 
 Zone de quantité de la fenêtre d'ajout d'ingrédient : `.mode-toggle` (unité / g), champ, `.quantity-note` pour l'équivalent en grammes, puis `.picker-unit` (rappel « 1 saucisse = 130 g » et crayon) ou `.picker-unit-editor` (nom, poids, validation par icône). `.quantity-note` sert aussi dans une ligne `.ingredient-row` comptée en unités.
+
+Saisie libre de la même fenêtre : `.mode-toggle` en tête (Rechercher / Saisie libre), puis `.picker-free` (colonne qui défile si la fenêtre est trop basse) contenant le nom en `.picker-search`, la quantité en `.picker-quantity`, une `.quantity-note` et `.nutrition-fields` (quatre `.picker-quantity` sur deux colonnes). Une recherche sans résultat propose la saisie libre par un `button.picker-result` sous l'`.empty-state`. La note `.picker-result-note` vaut « personnel » pour un aliment saisi librement.
+
+Avis de l'IA au planning : `.day-column-title` (nom du jour + deux `.icon-button.ai-button`), `.ai-button.loading` (couleur en boucle pendant la requête, fixe sous `prefers-reduced-motion`), `.ai-button:disabled` (icône effacée), `.day-column--score-0` à `--score-10` (fond du rouge au vert par l'orange), `.ai-comment` et `.ai-day-score` dans la fenêtre.
 
 ## Supprimer : quel geste
 

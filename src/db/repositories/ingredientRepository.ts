@@ -21,6 +21,11 @@ export async function getByIds(ids: string[]): Promise<Ingredient[]> {
   return (await db.ingredients.bulkGet(ids)).filter((i): i is Ingredient => i !== undefined);
 }
 
+/** Aliments personnels, saisis librement. `isCustom` est un booléen, qu'IndexedDB n'indexe pas : filtre en mémoire. */
+export async function listCustom(): Promise<Ingredient[]> {
+  return db.ingredients.filter((i) => i.isCustom).toArray();
+}
+
 export async function create(data: Omit<Ingredient, 'id' | 'createdAt' | 'isCustom' | 'source'>): Promise<Ingredient> {
   const ingredient: Ingredient = {
     ...data,

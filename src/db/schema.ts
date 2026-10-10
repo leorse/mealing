@@ -80,6 +80,17 @@ export interface WeekPlan {
   id?: string;
   weekStart: string; // lundi de la semaine, ISO date
   notes?: string;
+  // Avis de l'IA, par date, et bilan de la semaine. Non indexés, donc sans migration.
+  aiReviews?: Record<string, AiDayReview>;
+  aiSummary?: { text: string; reviewedAt: string };
+}
+
+export interface AiDayReview {
+  score: number; // entier de 0 à 10
+  comment: string;
+  reviewedAt: string;
+  // Empreinte de la journée au moment de l'avis : si elle a changé, l'avis est dépassé.
+  signature: string;
 }
 
 export interface MealSlot {

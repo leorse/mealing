@@ -37,7 +37,7 @@ Tout est déclaré dans [app/router.tsx](../../src/app/router.tsx).
 | `/nutrition`, `/nutrition/log`, `/nutrition/deviations` | `nutrition/*` | À venir |
 | `/analytics` | `analytics/AnalyticsScreen` | À venir |
 | `/export` | `export/ExportScreen` | À venir |
-| `/settings` | `settings/SettingsScreen` | À venir |
+| `/settings` | `settings/SettingsScreen` | Fait (avis de l'IA : clé et modèle) |
 
 Un écran « À venir » est une coquille : `<div className="screen"><h1>Titre</h1><p>À venir.</p></div>`.
 

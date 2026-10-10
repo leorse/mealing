@@ -23,4 +23,5 @@ Mealing est une PWA local-first de planification des repas et de suivi nutrition
 
 - [openspec/specs/](../openspec/specs/) — comportement livré, par capacité (`app-shell-layout`, `meal-planning`, `recipe-authoring`, `theming`).
 - [spec.md](../spec.md) — vision cible complète du produit (peut être en avance sur le code).
+- [1min.app.md](1min.app.md) — documentation de l'API 1min.AI utilisée pour l'avis de l'IA.
 - [log.md](log.md) — historique des évolutions de cette base.

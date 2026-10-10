@@ -1,13 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import { search as searchIngredients, setPortion } from '../db/repositories/ingredientRepository';
+import {
+  create as createIngredient,
+  listCustom,
+  search as searchIngredients,
+  setPortion,
+} from '../db/repositories/ingredientRepository';
+import { normalize } from '../services/ingredientSearch';
+import { EMPTY_PER_100G, isPer100gDraftValid, per100gFromDraft } from '../services/nutrition';
 import { formatGrams, gramsFor, hasOwnUnit, hasPortion, pluralizeUnit } from '../services/portions';
 import MaskIcon from './MaskIcon';
+import NutritionFields from './NutritionFields';
 import type { Ingredient } from '../db/schema';
 
 const MIN_QUERY_LENGTH = 2;
 const DEFAULT_QUANTITY_G = 100;
 
-type Mode = 'G' | 'UNIT';
+type QuantityMode = 'G' | 'UNIT';
+type EntryMode = 'SEARCH' | 'FREE';
 
 export interface IngredientChoice {
   ingredient: Ingredient;
@@ -36,11 +45,18 @@ export default function IngredientPickerModal({
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Ingredient[]>([]);
   const [selected, setSelected] = useState<Ingredient | null>(null);
-  const [mode, setMode] = useState<Mode>('G');
+  const [quantityMode, setQuantityMode] = useState<QuantityMode>('G');
   const [quantity, setQuantity] = useState<number | ''>(DEFAULT_QUANTITY_G);
   const [isEditingUnit, setIsEditingUnit] = useState(false);
   const [unitLabel, setUnitLabel] = useState('');
   const [unitG, setUnitG] = useState<number | ''>('');
+  const [entryMode, setEntryMode] = useState<EntryMode>('SEARCH');
+  const [freeName, setFreeName] = useState('');
+  const [freeQuantity, setFreeQuantity] = useState<number | ''>(DEFAULT_QUANTITY_G);
+  const [freeValues, setFreeValues] = useState(EMPTY_PER_100G);
+  // Noms normalisés des aliments personnels : un nom déjà pris ne se saisit pas une seconde fois.
+  const [customNames, setCustomNames] = useState<string[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Repartir d'une fenêtre vierge à chaque ouverture : ajustement pendant le rendu
@@ -52,11 +68,27 @@ export default function IngredientPickerModal({
       setQuery('');
       setResults([]);
       setSelected(null);
-      setMode('G');
+      setQuantityMode('G');
       setQuantity(DEFAULT_QUANTITY_G);
       setIsEditingUnit(false);
+      setEntryMode('SEARCH');
+      setFreeName('');
+      setFreeQuantity(DEFAULT_QUANTITY_G);
+      setFreeValues(EMPTY_PER_100G);
+      setIsCreating(false);
     }
   }
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    listCustom().then((found) => {
+      if (!cancelled) setCustomNames(found.map((i) => normalize(i.name)));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   // Le focus est un effet de bord sur le DOM : il reste dans un effet.
   useEffect(() => {
@@ -86,7 +118,17 @@ export default function IngredientPickerModal({
   if (!open) return null;
 
   const quantityIsValid = quantity !== '' && quantity > 0;
-  const canConfirm = selected !== null && quantityIsValid;
+  const isFree = entryMode === 'FREE';
+  const trimmedFreeName = freeName.trim();
+  const freeNameIsTaken = trimmedFreeName.length > 0 && customNames.includes(normalize(trimmedFreeName));
+  const canConfirmFree =
+    trimmedFreeName.length > 0 &&
+    !freeNameIsTaken &&
+    freeQuantity !== '' &&
+    freeQuantity > 0 &&
+    isPer100gDraftValid(freeValues) &&
+    !isCreating;
+  const canConfirm = isFree ? canConfirmFree : selected !== null && quantityIsValid;
   const searched = query.trim().length >= MIN_QUERY_LENGTH;
   // Sous le seuil, on n'affiche rien plutôt que de vider l'état depuis l'effet.
   const visibleResults = searched ? results : [];
@@ -97,17 +139,17 @@ export default function IngredientPickerModal({
     setSelected(ingredient);
     setIsEditingUnit(false);
     if (hasOwnUnit(ingredient)) {
-      setMode('UNIT');
+      setQuantityMode('UNIT');
       setQuantity(1);
     } else {
-      setMode('G');
+      setQuantityMode('G');
       setQuantity(DEFAULT_QUANTITY_G);
     }
   }
 
   /** Changer de mode convertit la valeur saisie au lieu de la perdre. */
-  function changeMode(next: Mode) {
-    if (next === mode || !selected || !hasPortion(selected)) return;
+  function changeMode(next: QuantityMode) {
+    if (next === quantityMode || !selected || !hasPortion(selected)) return;
     if (quantity !== '') {
       setQuantity(
         next === 'G'
@@ -115,7 +157,7 @@ export default function IngredientPickerModal({
           : Math.max(0.5, Math.round((quantity / selected.portionG) * 2) / 2),
       );
     }
-    setMode(next);
+    setQuantityMode(next);
   }
 
   function openUnitEditor() {
@@ -135,124 +177,198 @@ export default function IngredientPickerModal({
     onIngredientChange?.(updated);
   }
 
+  /** La recherche n'a rien donné : le texte cherché devient le nom de l'ingrédient libre. */
+  function startFreeEntry(name: string) {
+    setFreeName(name);
+    setEntryMode('FREE');
+  }
+
+  /** L'ingrédient libre devient un aliment personnel, retrouvé ensuite par la recherche. */
+  async function confirmFree() {
+    if (!canConfirmFree) return;
+    setIsCreating(true);
+    const ingredient = await createIngredient({
+      name: trimmedFreeName,
+      category: 'Autres',
+      ...per100gFromDraft(freeValues),
+    });
+    onConfirm({ ingredient, quantityG: Number(freeQuantity) });
+  }
+
   function confirm() {
+    if (isFree) {
+      confirmFree();
+      return;
+    }
     if (!selected || !quantityIsValid) return;
-    if (mode === 'UNIT' && hasPortion(selected)) {
+    if (quantityMode === 'UNIT' && hasPortion(selected)) {
       onConfirm({ ingredient: selected, quantityG: gramsFor(quantity, selected.portionG), unitCount: quantity });
     } else {
       onConfirm({ ingredient: selected, quantityG: quantity });
     }
   }
 
-  const isCounting = mode === 'UNIT' && selected !== null && hasPortion(selected);
+  const isCounting = quantityMode === 'UNIT' && selected !== null && hasPortion(selected);
 
   return (
     <div className="modal-overlay">
       <div className="modal-card modal-card--picker" role="dialog" aria-modal="true" aria-label="Ajouter un ingrédient">
-        <input
-          ref={searchRef}
-          className="picker-search"
-          placeholder="Rechercher un ingrédient…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-
-        <div className="picker-results">
-          {searched && visibleResults.length === 0 && (
-            <p className="empty-state">Aucun ingrédient ne correspond à cette recherche.</p>
-          )}
-
-          <ul className="picker-result-list">
-            {visibleResults.map((ingredient) => {
-              const alreadyAdded = existingIngredientIds.includes(ingredient.id!);
-              return (
-                <li key={ingredient.id}>
-                  <button
-                    type="button"
-                    className={`picker-result ${selected?.id === ingredient.id ? 'selected' : ''}`}
-                    disabled={alreadyAdded}
-                    onClick={() => select(ingredient)}
-                  >
-                    <span className="picker-result-name">{ingredient.name}</span>
-                    {alreadyAdded && <span className="picker-result-note">déjà ajouté</span>}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+        <div className="mode-toggle">
+          <button type="button" className={isFree ? '' : 'active'} onClick={() => setEntryMode('SEARCH')}>
+            Rechercher
+          </button>
+          <button type="button" className={isFree ? 'active' : ''} onClick={() => setEntryMode('FREE')}>
+            Saisie libre
+          </button>
         </div>
 
-        {selected && hasPortion(selected) && (
-          <div className="mode-toggle">
-            <button type="button" className={mode === 'UNIT' ? 'active' : ''} onClick={() => changeMode('UNIT')}>
-              {selected.portionLabel}
-            </button>
-            <button type="button" className={mode === 'G' ? 'active' : ''} onClick={() => changeMode('G')}>
-              g
-            </button>
+        {isFree ? (
+          <div className="picker-free">
+            <input
+              className="picker-search"
+              placeholder="Nom de l'ingrédient"
+              aria-label="Nom de l'ingrédient"
+              autoFocus
+              value={freeName}
+              onChange={(e) => setFreeName(e.target.value)}
+            />
+            {freeNameIsTaken && (
+              <p className="quantity-note">Cet aliment existe déjà : choisissez-le dans « Rechercher ».</p>
+            )}
+
+            <label className="picker-quantity">
+              Quantité (g)
+              <input
+                type="number"
+                min={1}
+                value={freeQuantity}
+                onChange={(e) => setFreeQuantity(e.target.value === '' ? '' : Number(e.target.value))}
+              />
+            </label>
+
+            <p className="quantity-note">
+              Valeurs pour 100 g, facultatives : sans elles, l'ingrédient ne compte pas dans les valeurs
+              nutritionnelles du plat.
+            </p>
+            <NutritionFields value={freeValues} onChange={setFreeValues} />
           </div>
-        )}
+        ) : (
+          <>
+            <input
+              ref={searchRef}
+              className="picker-search"
+              placeholder="Rechercher un ingrédient…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
 
-        <label className="picker-quantity">
-          {isCounting ? `Nombre (${selected.portionLabel})` : 'Quantité (g)'}
-          <input
-            type="number"
-            min={isCounting ? 0.5 : 1}
-            step={isCounting ? 0.5 : 1}
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
-          />
-        </label>
+            <div className="picker-results">
+              {searched && visibleResults.length === 0 && (
+                <>
+                  <p className="empty-state">Aucun ingrédient ne correspond à cette recherche.</p>
+                  <button type="button" className="picker-result" onClick={() => startFreeEntry(query.trim())}>
+                    Saisir « {query.trim()} » librement
+                  </button>
+                </>
+              )}
 
-        {isCounting && quantityIsValid && (
-          <p className="quantity-note">= {formatGrams(gramsFor(quantity, selected.portionG))}</p>
-        )}
-
-        {selected &&
-          (isEditingUnit ? (
-            <div className="picker-unit-editor">
-              <label className="picker-quantity">
-                Nom de l'unité
-                <input value={unitLabel} onChange={(e) => setUnitLabel(e.target.value)} placeholder="tranche" />
-              </label>
-              <label className="picker-quantity">
-                Poids (g)
-                <input
-                  type="number"
-                  min={1}
-                  value={unitG}
-                  onChange={(e) => setUnitG(e.target.value === '' ? '' : Number(e.target.value))}
-                />
-              </label>
-              <button
-                type="button"
-                className="icon-button"
-                disabled={!unitIsValid}
-                onClick={saveUnit}
-                aria-label="Enregistrer l'unité"
-                title="Enregistrer l'unité"
-              >
-                <MaskIcon src="/icons/common/save.svg" color="currentColor" size="1.4rem" />
-              </button>
+              <ul className="picker-result-list">
+                {visibleResults.map((ingredient) => {
+                  const alreadyAdded = existingIngredientIds.includes(ingredient.id!);
+                  return (
+                    <li key={ingredient.id}>
+                      <button
+                        type="button"
+                        className={`picker-result ${selected?.id === ingredient.id ? 'selected' : ''}`}
+                        disabled={alreadyAdded}
+                        onClick={() => select(ingredient)}
+                      >
+                        <span className="picker-result-name">{ingredient.name}</span>
+                        {alreadyAdded ? (
+                          <span className="picker-result-note">déjà ajouté</span>
+                        ) : (
+                          ingredient.isCustom && <span className="picker-result-note">personnel</span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
-          ) : (
-            <div className="picker-unit">
-              <span className="quantity-note">
-                {hasPortion(selected)
-                  ? `1 ${pluralizeUnit(selected.portionLabel, 1)} = ${formatGrams(selected.portionG)}`
-                  : 'Aucune unité définie pour cet aliment'}
-              </span>
-              <button
-                type="button"
-                className="icon-button"
-                onClick={openUnitEditor}
-                aria-label={hasPortion(selected) ? "Corriger l'unité" : 'Définir une unité'}
-                title={hasPortion(selected) ? "Corriger l'unité" : 'Définir une unité'}
-              >
-                <MaskIcon src="/icons/common/edit.svg" color="currentColor" />
-              </button>
-            </div>
-          ))}
+
+            {selected && hasPortion(selected) && (
+              <div className="mode-toggle">
+                <button type="button" className={quantityMode === 'UNIT' ? 'active' : ''} onClick={() => changeMode('UNIT')}>
+                  {selected.portionLabel}
+                </button>
+                <button type="button" className={quantityMode === 'G' ? 'active' : ''} onClick={() => changeMode('G')}>
+                  g
+                </button>
+              </div>
+            )}
+
+            <label className="picker-quantity">
+              {isCounting ? `Nombre (${selected.portionLabel})` : 'Quantité (g)'}
+              <input
+                type="number"
+                min={isCounting ? 0.5 : 1}
+                step={isCounting ? 0.5 : 1}
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
+              />
+            </label>
+
+            {isCounting && quantityIsValid && (
+              <p className="quantity-note">= {formatGrams(gramsFor(quantity, selected.portionG))}</p>
+            )}
+
+            {selected &&
+              (isEditingUnit ? (
+                <div className="picker-unit-editor">
+                  <label className="picker-quantity">
+                    Nom de l'unité
+                    <input value={unitLabel} onChange={(e) => setUnitLabel(e.target.value)} placeholder="tranche" />
+                  </label>
+                  <label className="picker-quantity">
+                    Poids (g)
+                    <input
+                      type="number"
+                      min={1}
+                      value={unitG}
+                      onChange={(e) => setUnitG(e.target.value === '' ? '' : Number(e.target.value))}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    disabled={!unitIsValid}
+                    onClick={saveUnit}
+                    aria-label="Enregistrer l'unité"
+                    title="Enregistrer l'unité"
+                  >
+                    <MaskIcon src="/icons/common/save.svg" color="currentColor" size="1.4rem" />
+                  </button>
+                </div>
+              ) : (
+                <div className="picker-unit">
+                  <span className="quantity-note">
+                    {hasPortion(selected)
+                      ? `1 ${pluralizeUnit(selected.portionLabel, 1)} = ${formatGrams(selected.portionG)}`
+                      : 'Aucune unité définie pour cet aliment'}
+                  </span>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    onClick={openUnitEditor}
+                    aria-label={hasPortion(selected) ? "Corriger l'unité" : 'Définir une unité'}
+                    title={hasPortion(selected) ? "Corriger l'unité" : 'Définir une unité'}
+                  >
+                    <MaskIcon src="/icons/common/edit.svg" color="currentColor" />
+                  </button>
+                </div>
+              ))}
+          </>
+        )}
 
         <div className="modal-actions">
           <button type="button" className="modal-button modal-button--no" onClick={onCancel}>

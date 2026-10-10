@@ -71,4 +71,4 @@ screens ─┬─> components ─┐
 
 - Manifest fourni tel quel dans [public/manifest.webmanifest](../../public/manifest.webmanifest) (`manifest: false` côté plugin). Couleur de thème `#2ECC71`.
 - Workbox met en cache `js, css, html, png, svg, woff2`. Open Food Facts est en `NetworkFirst`, cache d'un jour.
-- Seul appel réseau applicatif : [services/openFoodFacts.ts](../../src/services/openFoodFacts.ts).
+- Deux appels réseau applicatifs : [services/openFoodFacts.ts](../../src/services/openFoodFacts.ts) et [services/aiReview.ts](../../src/services/aiReview.ts) (1min.AI, sur clic explicite uniquement). La clé 1min.AI est saisie dans les Réglages et reste dans `appMeta` ; elle n'est jamais dans le bundle.

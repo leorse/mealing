@@ -9,6 +9,8 @@ timestamp: 2026-10-04T00:00:00Z
 
 Une ligne par changement, la plus récente en haut.
 
+- **2026-10-08** — Ingrédient libre : aliments personnels (`listCustom`, `create`, `update`), `lacksNutrition` et brouillon `Per100gDraft` dans `services/nutrition.ts`, composants `NutritionFields` et `IngredientNutritionModal`, classes `.picker-free`, `.nutrition-fields`.
+- **2026-10-06** — Avis de l'IA : règle réseau de CLAUDE.md réécrite, `services/aiReview.ts`, `settingsRepository`, `WeekPlan.aiReviews`, `AiReviewModal`, écran Réglages, icônes `ia` / `comment-ia`, classes `.ai-button`, `.day-column--score-*`.
 - **2026-10-06** — Saisie à l'unité : `unitCount`, `setPortion`, `ensureCiqualPortions`, `services/portions.ts`, classes `.quantity-note`, `.picker-unit`, `.picker-unit-editor`.
 - **2026-10-06** — Portions estimées : colonnes `portion_g` / `portion_label` dans `ciqual.sql`, champs `portionG` / `portionLabel` sur `Ingredient`.
 - **2026-10-05** — Recherche d'ingrédient : règles de classement dans domain-rules, `services/ingredientSearch.ts`.

@@ -1,4 +1,4 @@
-import { db, type WeekPlan, type MealSlot, type ShoppingItemState } from '../schema';
+import { db, type WeekPlan, type MealSlot, type ShoppingItemState, type AiDayReview } from '../schema';
 
 /** Lecture seule — n'écrit jamais, safe à utiliser dans une useLiveQuery. */
 export async function getWeek(weekStart: string): Promise<WeekPlan | undefined> {
@@ -103,6 +103,22 @@ export async function clearShoppingList(): Promise<void> {
   await db.mealSlots
     .filter((s) => s.includeInShopping === true)
     .modify({ includeInShopping: false, shoppingItemStates: undefined });
+}
+
+/** Enregistre les avis d'une demande : les jours fournis sont remplacés, les autres conservés.
+ *  Le bilan n'accompagne qu'une demande portant sur la semaine entière. */
+export async function saveAiReviews(
+  weekStart: string,
+  reviews: Record<string, AiDayReview>,
+  summary?: { text: string; reviewedAt: string },
+): Promise<void> {
+  await db.transaction('rw', db.weekPlans, async () => {
+    const week = await ensureWeek(weekStart);
+    await db.weekPlans.update(week.id!, {
+      aiReviews: { ...week.aiReviews, ...reviews },
+      ...(summary && { aiSummary: summary }),
+    });
+  });
 }
 
 export async function copyWeek(fromWeekStart: string, toWeekStart: string): Promise<void> {

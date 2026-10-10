@@ -69,6 +69,17 @@ Comportement spécifié dans la capacité OpenSpec `shopping-list`. Calcul dans 
 - **Tout supprimer** : éteint toutes les pastilles après confirmation, sans supprimer aucun repas.
 - Agir sur un ingrédient depuis sa ligne groupée vise toutes ses occurrences ; depuis le détail déplié ou la vue par plat, une seule.
 
+## Avis de l'IA
+
+Comportement spécifié dans la capacité OpenSpec `ai-meal-review`. Tout est dans [services/aiReview.ts](../../src/services/aiReview.ts) ; l'API est décrite dans [1min.app.md](../1min.app.md).
+
+- **Sur clic uniquement** : icône IA d'un jour, ou de l'en-tête pour la semaine. Une seule requête, sans diffusion, même pour sept jours.
+- **Transmis** (`buildPrompt`) : les repas des jours demandés (créneau, nom, kcal, écart, ingrédients des plats maison) et l'objectif (calories, macros, but). **Jamais** prénom, date de naissance, sexe, poids, taille.
+- **Réponse** (`parseReview`) : un objet JSON `{ days: [{ date, score, comment }], summary? }`. Validation tout ou rien — chaque date demandée une fois, note entière de 0 à 10, commentaire non vide, bilan pour la semaine. Une anomalie rejette tout et rien n'est enregistré.
+- **Note toujours par jour**, de 0 à 10 ; le bilan n'existe que pour une demande de semaine.
+- **Dépassé** : l'avis garde la `daySignature` de la journée (créneau, nom, calories, écart, plat). Si la signature courante diffère, la teinte s'efface et la fenêtre le signale ; l'avis reste lisible.
+- **Échecs** distingués par `AiReviewError.code` : `NO_KEY`, `UNAUTHORIZED`, `RATE_LIMITED`, `NETWORK`, `INVALID_RESPONSE`.
+
 ## Saisie à l'unité
 
 Comportement spécifié dans la capacité OpenSpec `ingredient-portions`. Conversions et mise en forme dans [services/portions.ts](../../src/services/portions.ts).
@@ -78,6 +89,16 @@ Comportement spécifié dans la capacité OpenSpec `ingredient-portions`. Conver
 - **Affichage** par `formatQuantity` : « 3 saucisses (390 g) » ou « 390 g ». Pluriel à partir de 2 ; libellé invariable s'il est abrégé, composé, ou finit par s, x, z ; `+x` après `au`.
 - **Corriger une unité** (`setPortion`) : les plats comptés en unités gardent leur nombre et prennent le nouveau poids ; ceux saisis en grammes ne bougent pas. `isHealthy` n'est recalculé qu'au prochain enregistrement du plat.
 - Les portions fournies avec Ciqual sont des **estimations**, pas des données Ciqual.
+
+## Ingrédient libre
+
+Un ingrédient absent des aliments enregistrés se saisit librement dans la fenêtre d'ajout (nom, grammes, valeurs pour 100 g facultatives). Il devient un **aliment personnel** (`isCustom`, `source: 'CUSTOM'`, catégorie « Autres ») et suit ensuite le parcours de tout aliment : recherche, courses, avis de l'IA.
+
+- **Quatre valeurs seulement** : calories, protéines, glucides, lipides pour 100 g, à 0 par défaut ; un champ vide vaut 0, une valeur négative bloque la validation.
+- **Non renseigné** (`lacksNutrition`) : aliment personnel dont les quatre valeurs sont nulles. Il compte pour zéro dans le plat et sa ligne le signale. Un aliment Ciqual à 0 kcal n'est pas concerné.
+- **Nom unique** parmi les aliments personnels, casse et accents ignorés : un nom déjà pris bloque la saisie libre et renvoie vers la recherche. Un nom identique à un aliment Ciqual reste permis.
+- **Corriger les valeurs** (`IngredientNutritionModal`, depuis la ligne du plat) : écrit l'aliment tout de suite, sans attendre l'enregistrement du plat, donc pour tous les plats qui l'utilisent. `isHealthy` n'est recalculé qu'au prochain enregistrement de chaque plat ; `caloriesOverride` des créneaux déjà planifiés ne bouge pas.
+- L'aliment est créé à la validation de la fenêtre : il subsiste si le plat est ensuite abandonné.
 
 ## Recherche d'ingrédient
 
