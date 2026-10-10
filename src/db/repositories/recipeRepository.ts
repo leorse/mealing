@@ -36,6 +36,8 @@ export interface RecipeInput {
   cookTimeMin?: number;
   difficulty?: Recipe['difficulty'];
   isHealthy?: boolean;
+  /** Description libre d'origine ; fournie à la création d'un plat décrit, jamais par le formulaire. */
+  sourceText?: string;
   tags?: string[];
   caloriesPerServing?: number;
   proteinsPerServing?: number;
@@ -48,6 +50,7 @@ export interface RecipeIngredientInput {
   quantityG: number;
   unitCount?: number;
   unitLabel?: string;
+  isEstimated?: boolean;
 }
 
 export async function create(data: RecipeInput, ingredients: RecipeIngredientInput[]): Promise<Recipe> {

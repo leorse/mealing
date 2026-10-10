@@ -100,6 +100,35 @@ Un ingrédient absent des aliments enregistrés se saisit librement dans la fen�
 - **Corriger les valeurs** (`IngredientNutritionModal`, depuis la ligne du plat) : écrit l'aliment tout de suite, sans attendre l'enregistrement du plat, donc pour tous les plats qui l'utilisent. `isHealthy` n'est recalculé qu'au prochain enregistrement de chaque plat ; `caloriesOverride` des créneaux déjà planifiés ne bouge pas.
 - L'aliment est créé à la validation de la fenêtre : il subsiste si le plat est ensuite abandonné.
 
+## Plat décrit en texte libre
+
+Comportement spécifié dans la capacité OpenSpec `dish-from-text`. Tout est dans [services/dishFromText.ts](../../src/services/dishFromText.ts) : fonctions pures, sauf `analyze` qui enchaîne le réseau et le worker.
+
+**Par lot, toujours.** `analyze({ texts })` prend une liste de descriptions et rend une liste de `DishResult` de même longueur et de même ordre. L'écran « Décrire un plat » passe une seule description ; une génération de plusieurs plats appellera la même fonction. Deux demandes à 1min.AI en tout, quel que soit le nombre de plats.
+
+| Étape | Fonction | Rôle |
+|---|---|---|
+| 1 | `buildDecomposePrompt` → `parseDecomposition` | L'IA rend, par plat, un nom et des ingrédients : texte de recherche au vocabulaire Ciqual, état, grammes, provenance de la quantité, confiance, et `parts` pour un aliment composé |
+| 2 | `expandComposites` | Un aliment composé devient ses ingrédients simples, au prorata ; la somme vaut son poids |
+| 3 | `distinctQueries` → `searchFoods` | Recherche sémantique locale, 10 candidats (`CANDIDATE_COUNT`) par texte de recherche distinct |
+| 4 | `buildChoicePrompt` → `parseChoices` | L'IA trie : un identifiant d'aliment par ingrédient, ou `null` |
+| 5 | `applyChoices`, `userQuantitiesIntact` | Contrôles et repli |
+| 6 | `mergeSameIngredient` | Un aliment ne figure qu'une fois par plat |
+
+- **Les valeurs nutritionnelles viennent de Ciqual, jamais de l'IA** : les consignes l'interdisent, les lecteurs ignorent toute clé inattendue, et le calcul passe par `computeRecipeNutrition`.
+- **Quantité de l'utilisateur d'abord** : `source: 'USER'` quand la description donne un poids, un nombre ou une fraction ; sinon `'ESTIMATE'`. Un nombre (`count`) compte la ligne en unités si l'aliment retenu a une unité propre (`hasOwnUnit`), sinon le poids rendu par l'IA sert.
+- **Le tri ne touche pas aux quantités** : sa réponse n'en contient pas, `applyChoices` ne lit que le rang et l'identifiant.
+- **Contrôle du tri** : l'identifiant doit figurer parmi les candidats de l'ingrédient. Hors liste, inventé, oublié, cité deux fois, ou plat entier absent : la ligne prend le candidat le plus proche et passe « à vérifier » (`needsReview`), comme une ligne de confiance `LOW`. `null` ou aucun candidat : ligne sans aliment, qui ne compte pas et n'est pas enregistrée.
+- **Validation à deux niveaux** : une réponse illisible en entier lève une `AiError` ; un plat absent, en double ou à ingrédient invalide passe seul en `FAILED`, les autres continuent. `items` vide → `NO_FOOD`.
+- **Échec du tri seul** : `ChoiceStepError` porte un `checkpoint` (décomposition et candidats) ; le repasser à `analyze` ne refait que le tri.
+- **Listes de candidats écrites une fois** par texte de recherche distinct dans la demande de tri, même si plusieurs plats s'y réfèrent.
+- **Ajustements** : `resizeLine` (petite 0,7 · normale 1 · grande 1,3 de l'estimation initiale, la ligne reste estimée), `setLineWeight` (poids précis : quantité de l'utilisateur, refus si ≤ 0), `replaceLineIngredient` (garde la quantité et sa provenance).
+- **Validation de l'écran** : `recipeRepository.create` d'un plat maison d'une portion ; rien n'est écrit avant. `isEstimated` suit la ligne enregistrée et tombe dès que sa quantité est modifiée dans le formulaire.
+- **Origine gardée** : la description est enregistrée dans `Recipe.sourceText`. Le plat porte l'icône de l'IA dans la liste et rappelle sa description au détail ; pour tout le reste c'est un plat maison ordinaire.
+- **Un clic, une action** : « Analyser » et « Valider » se grisent dès le clic (`once` dans `DishFromTextScreen`) ; un second clic est ignoré.
+- **Transmis à l'IA** : la description, puis les ingrédients qui en sont issus et les noms et identifiants des aliments candidats. Jamais le profil ni le planning.
+- **Échecs** : `DishErrorCode` = codes de `AiError` + `NO_FOOD`, messages par `dishErrorMessage` ; les échecs de la recherche locale sont des `EmbeddingError`.
+
 ## Recherche d'ingrédient
 
 Comportement spécifié dans la capacité OpenSpec `ingredient-search`. Classement dans [services/ingredientSearch.ts](../../src/services/ingredientSearch.ts) (fonctions pures), appelé par `ingredientRepository.search`.

@@ -192,6 +192,18 @@ export interface HealthyCriteriaInput {
   mainIngredientNutriScore: 'A' | 'B' | 'C' | 'D' | 'E' | undefined;
 }
 
+/** Le critère "healthy" d'un plat maison, depuis ses lignes : c'est la valeur stockée à l'enregistrement. */
+export function isHealthyFromItems(items: RecipeNutritionItem[], servings: number): boolean {
+  const per = perServing(computeRecipeNutrition(items), servings);
+  return isHealthyRecipe({
+    caloriesPerServing: per.calories,
+    saturatedFatPerServing: per.saturatedFat,
+    fiberPerServing: per.fiber,
+    sugarsPerServing: per.sugars,
+    mainIngredientNutriScore: mainIngredient(items)?.nutriScore,
+  });
+}
+
 /** Une recette est "healthy" si elle remplit au moins 3 des 5 critères. */
 export function isHealthyRecipe(input: HealthyCriteriaInput): boolean {
   const criteria = [

@@ -5,15 +5,18 @@
   "type": "module",
   "scripts": {
     "seed:ciqual": "node scripts/convert-ciqual.mjs",
-    "predev": "npm run seed:ciqual",
+    "embed:ciqual": "node scripts/embed-ciqual.mjs",
+    "copy:ort": "node scripts/copy-ort.mjs",
+    "predev": "npm run seed:ciqual && npm run copy:ort",
     "dev": "vite",
-    "prebuild": "npm run seed:ciqual",
+    "prebuild": "npm run seed:ciqual && npm run copy:ort",
     "build": "tsc -b && vite build",
     "deploy": "npm run build && npx wrangler deploy",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.1",
     "@zxing/browser": "^0.2.1",
     "date-fns": "^4.4.0",
     "dexie": "^4.4.5",

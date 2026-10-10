@@ -54,6 +54,8 @@ export interface Recipe {
   difficulty?: 'EASY' | 'MEDIUM' | 'HARD'; // sans objet pour un plat tout prêt (kind: 'PREPARED')
   isHealthy?: boolean;
   isFavorite?: boolean; // non indexé, donc sans migration : absent = non favori
+  // Description libre dont le plat a été tiré par l'IA. Non indexé ; sa présence dit que le plat vient de l'IA.
+  sourceText?: string;
   photoBlob?: Blob;
   tags?: string[];
   // Renseigné uniquement si kind === 'PREPARED' — valeurs nutritionnelles par portion, saisies à la main
@@ -74,6 +76,9 @@ export interface RecipeIngredient {
   // quantityG reste la vérité des calculs et vaut alors unitCount × portionG de l'aliment.
   unitCount?: number;
   unitLabel?: string;
+  // Quantité estimée par l'IA à partir d'une description libre, non confirmée par l'utilisateur.
+  // Non indexé, absent = quantité saisie ou corrigée à la main.
+  isEstimated?: boolean;
 }
 
 export interface WeekPlan {

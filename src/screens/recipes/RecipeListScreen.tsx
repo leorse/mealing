@@ -36,7 +36,15 @@ export default function RecipeListScreen() {
         {filtered.map((recipe) => (
           <li key={recipe.id} className="recipe-list-item">
             <Link to={`/recipes/${recipe.id}`} className="recipe-list-link">
-              <span className="recipe-name">{recipe.name}</span>
+              <span className="recipe-name">
+                {recipe.name}
+                {recipe.sourceText && (
+                  <>
+                    {' '}
+                    <MaskIcon src="/icons/common/ia.svg" color="currentColor" size="1rem" label="Plat créé par l'IA" />
+                  </>
+                )}
+              </span>
               <span className="recipe-meta">
                 {recipe.kind === 'PREPARED' ? (
                   <span className="badge">🍱 Plat tout prêt</span>
@@ -60,7 +68,11 @@ export default function RecipeListScreen() {
         ))}
       </ul>
 
-      <Link to="/recipes/new" className="fab" aria-label="Créer un plat">
+      <Link to="/recipes/describe" className="fab fab--second" aria-label="Décrire un plat" title="Décrire un plat">
+        <MaskIcon src="/icons/common/ia.svg" color="currentColor" size="1.6rem" />
+      </Link>
+
+      <Link to="/recipes/new" className="fab" aria-label="Créer un plat" title="Créer un plat">
         <MaskIcon src="/icons/common/add.svg" color="currentColor" size="2rem" />
       </Link>
 

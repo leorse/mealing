@@ -23,7 +23,7 @@ Base Dexie `mealing`, **version 1**, définie dans [db/schema.ts](../../src/db/s
 | `dailyLogs` | `id` | `logDate` | Journal quotidien (pas encore utilisé) |
 | `deviations` | `id` | `deviationDate` | Écarts (pas encore utilisé) |
 | `shoppingLists` / `shoppingItems` | `id` | `weekPlanId` / `shoppingListId, category, isChecked` | Courses (pas encore utilisé) |
-| `appMeta` | `key` | — | Clés techniques (`ciqualSeededAt`) |
+| `appMeta` | `key` | — | Clés techniques (`ciqualSeededAt`, `ciqualPortionsSeededAt`, `ciqualIndexVersion`) et réglages |
 
 ## Points à connaître
 
@@ -32,8 +32,11 @@ Base Dexie `mealing`, **version 1**, définie dans [db/schema.ts](../../src/db/s
 - **`Ingredient.portionG` / `portionLabel`** (non indexés, optionnels) : poids estimé d'une portion ou d'une unité usuelle (« 1 saucisse = 130 g », « 1 c. à soupe = 10 g »). Renseignés pour les 3 281 aliments Ciqual par les colonnes `portion_g` / `portion_label` de `assets/ciqual.sql` ; ce sont des moyennes indicatives, pas des données Ciqual. Corrigés par `ingredientRepository.setPortion`, qui recalcule en transaction le `quantityG` des lignes de plats comptées en unités.
 - **Aliment personnel** (`isCustom: true`, `source: 'CUSTOM'`) : créé par la saisie libre d'un ingrédient, sans nouveau champ. `isCustom` est un booléen, qu'IndexedDB n'indexe pas : `listCustom` filtre en mémoire. Règles dans [domain-rules.md](domain-rules.md#ingrédient-libre).
 - **`RecipeIngredient.unitCount`** (non indexé, optionnel) : présent quand la ligne a été saisie en unités. `quantityG` reste la vérité de tous les calculs et vaut alors `unitCount × portionG`. Le nom de l'unité n'est pas copié : il est lu sur l'aliment.
+- **`RecipeIngredient.isEstimated`** (non indexé, absent = faux) : quantité estimée par l'IA lors de l'analyse d'un plat décrit, non confirmée. Écrit à la validation du plat décrit, retiré par `updateQuantity` du formulaire dès que la quantité change, affiché par `≈` au détail.
+- **Mise à niveau de la base Ciqual** : `ingredientRepository.addMissingCiqual(version)` ajoute les aliments du seed absents de l'appareil quand la clé `ciqualIndexVersion` est en retard sur le manifeste des vecteurs. `bulkAdd` des identifiants manquants seulement : jamais de remplacement, qui écraserait une portion corrigée. Appelée par `prepareEmbedding`, pas au lancement.
 - **Mise à niveau des portions** : `ensureCiqualPortions` (clé `ciqualPortionsSeededAt`) les apporte au lancement aux aliments `CIQUAL` qui n'en ont pas, sans écraser une portion existante.
 - **`Recipe.kind`** change tout : `RECIPE` calcule ses valeurs depuis ses ingrédients et porte `prepTimeMin`, `cookTimeMin`, `difficulty`, `isHealthy` ; `PREPARED` n'a pas d'ingrédients et stocke `caloriesPerServing` (obligatoire) et les macros par portion, saisis à la main.
+- **`Recipe.sourceText`** (non indexé, absent = plat saisi à la main) : description libre dont le plat a été tiré par l'IA. Sa présence marque le plat dans la liste (icône `ia`) et s'affiche au détail. Écrit par la validation d'un plat décrit ; le formulaire ne l'envoie pas, donc il survit aux modifications.
 - **`Recipe.isFavorite`** (non indexé, absent = non favori) : basculé par `recipeRepository.setFavorite`, qui ne touche pas `updatedAt`. Hors de `RecipeInput`, il survit à l'enregistrement du formulaire.
 - **`MealSlot`** : plusieurs entrées possibles pour un même jour et un même `mealType`. `freeLabel` porte le nom affiché (y compris pour une recette), `caloriesOverride` porte les calories retenues, `isDeviation` distingue un écart d'une recette, `includeInShopping` (non indexé, absent = faux) marque le plat pour les courses, et `shoppingItemStates` (non indexé) porte l'état de ses articles dans la liste : clé = identifiant d'ingrédient (ou de la recette pour un plat tout prêt), valeur `'OFF'` (grisé) ou `'DELETED'` ; un article absent est actif.
 - **Identifiants** : `crypto.randomUUID()` généré par le repository, jamais par l'écran.
@@ -46,7 +49,7 @@ Un fichier par agrégat dans [db/repositories/](../../src/db/repositories/), fon
 | Fichier | Fonctions |
 |---|---|
 | `userProfileRepository.ts` | `getProfile`, `saveProfile` |
-| `ingredientRepository.ts` | `search` (50 résultats max, nom ou marque), `getByBarcode`, `getById`, `getByIds`, `listCustom` (aliments personnels, lecture pure), `create` (aliment personnel issu de la saisie libre), `saveImported` (OFF), `update` (valeurs d'un aliment personnel), `setPortion`, `remove` (custom uniquement) |
+| `ingredientRepository.ts` | `search` (50 résultats max, nom ou marque), `getByBarcode`, `getById`, `getByIds`, `listCustom` (aliments personnels, lecture pure), `create` (aliment personnel issu de la saisie libre), `saveImported` (OFF), `update` (valeurs d'un aliment personnel), `setPortion`, `remove` (custom uniquement), `addMissingCiqual` (mise à niveau depuis le seed) |
 | `recipeRepository.ts` | `list`, `getById`, `getByIds`, `getIngredients`, `getIngredientsForRecipes`, `create`, `update`, `remove` |
 | `planningRepository.ts` | `getWeek`, `ensureWeek`, `listSlotsForWeek`, `addSlot`, `addSlotForWeek`, `updateSlot`, `deleteSlot`, `markConsumed`, `copyWeek` ; courses : `listShoppingSlots`, `setSlotShopping`, `setShoppingItemStates`, `clearShoppingList` |
 

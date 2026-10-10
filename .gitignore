@@ -31,3 +31,10 @@ _bmad*
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# Moteur ONNX copié depuis node_modules par scripts/copy-ort.mjs
+public/ort
+
+# Vecteurs de la recherche intelligente : recalculés depuis assets/ciqual.sql s'ils manquent.
+# Leur manifeste (ciqual-index.json), lui, est versionné : il porte la version et l'empreinte.
+public/seed/ciqual-vectors.bin

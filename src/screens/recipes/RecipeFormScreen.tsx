@@ -11,13 +11,7 @@ import {
   getIngredients,
   type RecipeIngredientInput,
 } from '../../db/repositories/recipeRepository';
-import {
-  computeRecipeNutrition,
-  perServing,
-  mainIngredient,
-  isHealthyRecipe,
-  lacksNutrition,
-} from '../../services/nutrition';
+import { isHealthyFromItems, lacksNutrition } from '../../services/nutrition';
 import { formatGrams, gramsFor, hasPortion, pluralizeUnit } from '../../services/portions';
 import type { Ingredient, Recipe } from '../../db/schema';
 
@@ -26,6 +20,8 @@ interface DraftIngredient {
   quantityG: number;
   /** Présent quand la ligne se compte en unités de l'aliment ; quantityG en découle. */
   unitCount?: number;
+  /** Quantité estimée par l'IA ; retirée dès que l'utilisateur change la quantité. */
+  isEstimated?: boolean;
 }
 
 function IconNumberField({
@@ -127,7 +123,9 @@ export default function RecipeFormScreen() {
         const draft = await Promise.all(
           recipeIngredients.map(async (ri): Promise<DraftIngredient | null> => {
             const ingredient = await getIngredientById(ri.ingredientId);
-            return ingredient ? { ingredient, quantityG: ri.quantityG, unitCount: ri.unitCount } : null;
+            return ingredient
+              ? { ingredient, quantityG: ri.quantityG, unitCount: ri.unitCount, isEstimated: ri.isEstimated }
+              : null;
           }),
         );
         setIngredients(draft.filter((d): d is DraftIngredient => d !== null));
@@ -147,8 +145,8 @@ export default function RecipeFormScreen() {
       ingredients.map((d) => {
         if (d.ingredient.id !== ingredientId) return d;
         return d.unitCount !== undefined && hasPortion(d.ingredient)
-          ? { ...d, unitCount: value, quantityG: gramsFor(value, d.ingredient.portionG) }
-          : { ...d, quantityG: value };
+          ? { ...d, unitCount: value, quantityG: gramsFor(value, d.ingredient.portionG), isEstimated: undefined }
+          : { ...d, quantityG: value, isEstimated: undefined };
       }),
     );
   }
@@ -185,31 +183,25 @@ export default function RecipeFormScreen() {
           carbsPerServing: carbsPerServing === '' ? undefined : carbsPerServing,
           fatPerServing: fatPerServing === '' ? undefined : fatPerServing,
         }
-      : (() => {
-          const totals = computeRecipeNutrition(ingredients);
-          const per = perServing(totals, servings);
-          const isHealthy = isHealthyRecipe({
-            caloriesPerServing: per.calories,
-            saturatedFatPerServing: per.saturatedFat,
-            fiberPerServing: per.fiber,
-            sugarsPerServing: per.sugars,
-            mainIngredientNutriScore: mainIngredient(ingredients)?.nutriScore,
-          });
-          return {
-            name,
-            description: description || undefined,
-            servings,
-            kind,
-            prepTimeMin: prepTimeMin === '' ? undefined : prepTimeMin,
-            cookTimeMin: cookTimeMin === '' ? undefined : cookTimeMin,
-            difficulty,
-            isHealthy,
-          };
-        })();
+      : {
+          name,
+          description: description || undefined,
+          servings,
+          kind,
+          prepTimeMin: prepTimeMin === '' ? undefined : prepTimeMin,
+          cookTimeMin: cookTimeMin === '' ? undefined : cookTimeMin,
+          difficulty,
+          isHealthy: isHealthyFromItems(ingredients, servings),
+        };
 
     const ingredientInputs: RecipeIngredientInput[] = isPrepared
       ? []
-      : ingredients.map((d) => ({ ingredientId: d.ingredient.id!, quantityG: d.quantityG, unitCount: d.unitCount }));
+      : ingredients.map((d) => ({
+          ingredientId: d.ingredient.id!,
+          quantityG: d.quantityG,
+          unitCount: d.unitCount,
+          isEstimated: d.isEstimated,
+        }));
 
     if (isEdit && id) {
       await update(id, recipeInput, ingredientInputs);
@@ -341,13 +333,14 @@ export default function RecipeFormScreen() {
             {ingredients.length === 0 && <p className="empty-state">Aucun ingrédient ajouté.</p>}
 
             <ul className="ingredient-list">
-              {ingredients.map(({ ingredient, quantityG, unitCount }) => {
+              {ingredients.map(({ ingredient, quantityG, unitCount, isEstimated }) => {
                 const isCounting = unitCount !== undefined && hasPortion(ingredient);
                 return (
                 <li key={ingredient.id} className="ingredient-row">
                   <span className="ingredient-row-name">
                     {ingredient.name}
                     {isCounting && <span className="quantity-note"> · {formatGrams(quantityG)}</span>}
+                    {isEstimated && <span className="quantity-note"> · quantité estimée</span>}
                     {lacksNutrition(ingredient) && (
                       <span className="quantity-note"> · valeurs nutritionnelles non renseignées</span>
                     )}

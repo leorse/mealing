@@ -31,6 +31,7 @@ Tout est déclaré dans [app/router.tsx](../../src/app/router.tsx).
 | `/planning/:date` | `planning/DayDetailScreen` | À venir |
 | `/recipes` | `recipes/RecipeListScreen` | Fait |
 | `/recipes/new`, `/recipes/:id/edit` | `recipes/RecipeFormScreen` | Fait — **écran de référence** |
+| `/recipes/describe` | `recipes/DishFromTextScreen` | Fait — plat décrit en texte libre |
 | `/recipes/:id` | `recipes/RecipeDetailScreen` | Fait |
 | `/ingredients`, `/ingredients/scan`, `/ingredients/:id` | `ingredients/*` | À venir |
 | `/shopping` | `shopping/ShoppingListScreen` | Fait |

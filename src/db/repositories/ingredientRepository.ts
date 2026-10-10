@@ -1,7 +1,9 @@
 import { db, type Ingredient } from '../schema';
+import { fetchCiqual } from '../seed';
 import { rankIngredients } from '../../services/ingredientSearch';
 
 const SEARCH_LIMIT = 50;
+const CIQUAL_INDEX_VERSION_KEY = 'ciqualIndexVersion';
 
 /** Classe tous les aliments correspondants avant de couper : le meilleur résultat n'est jamais écarté. */
 export async function search(query: string): Promise<Ingredient[]> {
@@ -19,6 +21,24 @@ export async function getById(id: string): Promise<Ingredient | undefined> {
 
 export async function getByIds(ids: string[]): Promise<Ingredient[]> {
   return (await db.ingredients.bulkGet(ids)).filter((i): i is Ingredient => i !== undefined);
+}
+
+/**
+ * Met la base de l'appareil au niveau des vecteurs de recherche livrés : ajoute les aliments Ciqual
+ * qui lui manquent. Jamais de remplacement, qui écraserait une portion corrigée par l'utilisateur.
+ */
+export async function addMissingCiqual(indexVersion: number): Promise<void> {
+  const known = await db.appMeta.get(CIQUAL_INDEX_VERSION_KEY);
+  if (known && Number(known.value) >= indexVersion) return;
+
+  const seed = await fetchCiqual();
+  if (!seed) return;
+
+  await db.transaction('rw', db.ingredients, db.appMeta, async () => {
+    const present = new Set(await db.ingredients.toCollection().primaryKeys());
+    await db.ingredients.bulkAdd(seed.filter((ingredient) => !present.has(ingredient.id!)));
+    await db.appMeta.put({ key: CIQUAL_INDEX_VERSION_KEY, value: String(indexVersion) });
+  });
 }
 
 /** Aliments personnels, saisis librement. `isCustom` est un booléen, qu'IndexedDB n'indexe pas : filtre en mémoire. */

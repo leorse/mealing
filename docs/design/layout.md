@@ -44,7 +44,7 @@ Le planning sert de modèle : `.screen--wide` > `.week-header` puis `.week-grid-
 
 ## Bouton flottant
 
-`.fab` : disque vert de `3.25rem`, à `1.25rem` du bord droit et `5.5rem` du bas, icône blanche de `2rem`. Réservé à **l'action de création principale d'un écran de liste** (un seul par écran) :
+`.fab` : disque vert de `3.25rem`, à `1.25rem` du bord droit et `5.5rem` du bas, icône blanche de `2rem`. Réservé à **l'action de création principale d'un écran de liste**. Une seconde façon de créer se place au-dessus en `.fab.fab--second` (disque neutre à bordure, `9.5rem` du bas) : c'est le cas de « Décrire un plat » sur la liste des plats. Pas plus de deux.
 
 ```tsx
 <Link to="/recipes/new" className="fab" aria-label="Créer une recette">

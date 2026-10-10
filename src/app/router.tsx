@@ -8,6 +8,7 @@ import DayDetailScreen from '../screens/planning/DayDetailScreen';
 import RecipeListScreen from '../screens/recipes/RecipeListScreen';
 import RecipeDetailScreen from '../screens/recipes/RecipeDetailScreen';
 import RecipeFormScreen from '../screens/recipes/RecipeFormScreen';
+import DishFromTextScreen from '../screens/recipes/DishFromTextScreen';
 import IngredientSearchScreen from '../screens/ingredients/IngredientSearchScreen';
 import IngredientDetailScreen from '../screens/ingredients/IngredientDetailScreen';
 import BarcodeScanScreen from '../screens/ingredients/BarcodeScanScreen';
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
           { path: '/planning/:date', element: <DayDetailScreen /> },
           { path: '/recipes', element: <RecipeListScreen /> },
           { path: '/recipes/new', element: <RecipeFormScreen /> },
+          { path: '/recipes/describe', element: <DishFromTextScreen /> },
           { path: '/recipes/:id', element: <RecipeDetailScreen /> },
           { path: '/recipes/:id/edit', element: <RecipeFormScreen /> },
           { path: '/ingredients', element: <IngredientSearchScreen /> },

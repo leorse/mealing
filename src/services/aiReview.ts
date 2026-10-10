@@ -2,8 +2,7 @@ import type { MealSlot, UserProfile } from '../db/schema';
 import { getByIds as getRecipesByIds, getIngredientsForRecipes } from '../db/repositories/recipeRepository';
 import { getByIds as getIngredientsByIds } from '../db/repositories/ingredientRepository';
 import { mealTypeLabel, mealTypeOrder } from '../utils/mealTypes';
-
-const CHAT_URL = 'https://api.1min.ai/api/chat-with-ai';
+import { AiError, chat, extractJsonObject, type AiErrorCode } from './aiClient';
 
 export const DEFAULT_AI_MODEL = 'gpt-4o-mini';
 
@@ -18,18 +17,10 @@ export const AI_MODELS: { id: string; label: string }[] = [
   { id: 'mistral-medium-latest', label: 'Mistral Medium' },
 ];
 
-export type AiReviewErrorCode = 'NO_KEY' | 'UNAUTHORIZED' | 'RATE_LIMITED' | 'NETWORK' | 'INVALID_RESPONSE';
+// Anciens noms, gardés pour les écrans qui les importent d'ici.
+export { AiError as AiReviewError, type AiErrorCode as AiReviewErrorCode };
 
-export class AiReviewError extends Error {
-  code: AiReviewErrorCode;
-
-  constructor(code: AiReviewErrorCode) {
-    super(code);
-    this.code = code;
-  }
-}
-
-const ERROR_MESSAGES: Record<AiReviewErrorCode, string> = {
+const ERROR_MESSAGES: Record<AiErrorCode, string> = {
   NO_KEY: "Aucune clé d'accès n'est enregistrée. Saisis ta clé 1min.AI dans les Réglages pour demander l'avis de l'IA.",
   UNAUTHORIZED: "Le service a refusé la clé d'accès. Vérifie-la dans les Réglages.",
   RATE_LIMITED: 'Trop de demandes ont été envoyées. Réessaie dans quelques minutes.',
@@ -37,12 +28,12 @@ const ERROR_MESSAGES: Record<AiReviewErrorCode, string> = {
   INVALID_RESPONSE: "La réponse de l'IA n'a pas pu être lue. Rien n'a été modifié ; réessaie.",
 };
 
-export function aiErrorMessage(code: AiReviewErrorCode): string {
+export function aiErrorMessage(code: AiErrorCode): string {
   return ERROR_MESSAGES[code];
 }
 
 /** Vrai quand l'échec se règle dans les Réglages. */
-export function aiErrorNeedsSettings(code: AiReviewErrorCode): boolean {
+export function aiErrorNeedsSettings(code: AiErrorCode): boolean {
   return code === 'NO_KEY' || code === 'UNAUTHORIZED';
 }
 
@@ -180,19 +171,8 @@ export function buildPrompt(days: ReviewDay[], goal: ReviewGoal, withSummary: bo
  * pour ne jamais enregistrer une semaine notée à moitié.
  */
 export function parseReview(text: string, dates: string[], withSummary: boolean): ReviewResult {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end <= start) throw new AiReviewError('INVALID_RESPONSE');
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text.slice(start, end + 1));
-  } catch {
-    throw new AiReviewError('INVALID_RESPONSE');
-  }
-
-  const root = parsed as { days?: unknown; summary?: unknown };
-  if (!Array.isArray(root.days)) throw new AiReviewError('INVALID_RESPONSE');
+  const root = extractJsonObject(text) as { days?: unknown; summary?: unknown };
+  if (!Array.isArray(root.days)) throw new AiError('INVALID_RESPONSE');
 
   const days = dates.map((date) => {
     const matches = (root.days as { date?: unknown; score?: unknown; comment?: unknown }[]).filter((d) => d?.date === date);
@@ -205,12 +185,12 @@ export function parseReview(text: string, dates: string[], withSummary: boolean)
       entry.score <= 10 &&
       typeof entry.comment === 'string' &&
       entry.comment.trim().length > 0;
-    if (!isValid) throw new AiReviewError('INVALID_RESPONSE');
+    if (!isValid) throw new AiError('INVALID_RESPONSE');
     return { date, score: entry.score as number, comment: (entry.comment as string).trim() };
   });
 
   if (!withSummary) return { days };
-  if (typeof root.summary !== 'string' || root.summary.trim().length === 0) throw new AiReviewError('INVALID_RESPONSE');
+  if (typeof root.summary !== 'string' || root.summary.trim().length === 0) throw new AiError('INVALID_RESPONSE');
   return { days, summary: root.summary.trim() };
 }
 
@@ -224,41 +204,7 @@ export interface ReviewRequest {
 
 /** Envoie les journées à 1min.AI et rend les avis. Seul appel réseau de cette fonction, sur demande explicite. */
 export async function requestReview({ apiKey, model, days, goal, withSummary }: ReviewRequest): Promise<ReviewResult> {
-  const prompt = buildPrompt(days, goal, withSummary);
-  // Trace de mise au point : le message exact envoyé, pour le relire et l'améliorer. Jamais la clé.
-  console.log(`[Avis IA] Message envoyé (modèle ${model}) :
-${prompt}`);
-
-  let res: Response;
-  try {
-    res = await fetch(CHAT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'API-KEY': apiKey },
-      body: JSON.stringify({
-        type: 'UNIFY_CHAT_WITH_AI',
-        model,
-        promptObject: { prompt },
-      }),
-    });
-  } catch {
-    throw new AiReviewError('NETWORK');
-  }
-
-  if (res.status === 401) throw new AiReviewError('UNAUTHORIZED');
-  if (res.status === 429) throw new AiReviewError('RATE_LIMITED');
-  if (!res.ok) throw new AiReviewError('NETWORK');
-
-  let text: string;
-  try {
-    const body = (await res.json()) as { aiRecord?: { aiRecordDetail?: { resultObject?: string[] | string } } };
-    const result = body.aiRecord?.aiRecordDetail?.resultObject;
-    text = Array.isArray(result) ? result.join('') : (result ?? '');
-  } catch {
-    throw new AiReviewError('INVALID_RESPONSE');
-  }
-
-  console.log(`[Avis IA] Réponse reçue :
-${text}`);
+  const text = await chat({ apiKey, model, prompt: buildPrompt(days, goal, withSummary), trace: 'Avis IA' });
 
   return parseReview(
     text,

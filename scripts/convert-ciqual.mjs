@@ -2,58 +2,13 @@
 // consommé par src/db/seed.ts au premier lancement de l'app.
 // À relancer si assets/ciqual.sql est mis à jour : node scripts/convert-ciqual.mjs
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { SEED_DIR, ciqualHash, hasVectors, readCiqualRows, readIndex } from './ciqual-sql.mjs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SQL_PATH = join(__dirname, '../assets/ciqual.sql');
-const OUT_PATH = join(__dirname, '../public/seed/ciqual.json');
-
-const COLUMNS = [
-  'id', 'name', 'brand', 'barcode', 'category', 'calories_100g', 'proteins_100g',
-  'carbs_100g', 'sugars_100g', 'fat_100g', 'saturated_fat_100g', 'fiber_100g',
-  'salt_100g', 'glycemic_index', 'nutri_score', 'off_id', 'is_custom', 'source',
-  'user_id', 'created_at', 'portion_g', 'portion_label',
-];
-
-/** Tokenize une liste de valeurs SQL (VALUES(...)) en respectant les quotes et '' échappé. */
-function parseValueTuple(tuple) {
-  const values = [];
-  let i = 0;
-  const n = tuple.length;
-  while (i < n) {
-    while (i < n && (tuple[i] === ' ' || tuple[i] === ',')) i++;
-    if (i >= n) break;
-
-    if (tuple[i] === "'") {
-      i++;
-      let str = '';
-      while (i < n) {
-        if (tuple[i] === "'" && tuple[i + 1] === "'") {
-          str += "'";
-          i += 2;
-        } else if (tuple[i] === "'") {
-          i++;
-          break;
-        } else {
-          str += tuple[i];
-          i++;
-        }
-      }
-      values.push(str);
-    } else {
-      let raw = '';
-      while (i < n && tuple[i] !== ',') {
-        raw += tuple[i];
-        i++;
-      }
-      raw = raw.trim();
-      values.push(raw === 'NULL' ? null : Number(raw));
-    }
-  }
-  return values;
-}
+const OUT_PATH = join(SEED_DIR, 'ciqual.json');
 
 function toIngredient(row) {
   const isCustom = row.is_custom === 1 || row.is_custom === '1';
@@ -81,17 +36,27 @@ function toIngredient(row) {
   };
 }
 
-const sql = readFileSync(SQL_PATH, 'utf-8');
-const lines = sql.split('\n').filter((l) => l.startsWith('INSERT'));
+// Les vecteurs de la recherche sémantique sont calculés à part (plusieurs minutes) : ici on vérifie
+// seulement qu'ils viennent bien de cette base, pour ne jamais livrer une base et des vecteurs désaccordés.
+const index = readIndex();
+if (!index || index.sourceHash !== ciqualHash()) {
+  console.error(
+    index
+      ? 'assets/ciqual.sql a changé depuis le calcul des vecteurs de recherche.'
+      : 'Les vecteurs de recherche (public/seed/ciqual-index.json) sont absents.',
+  );
+  console.error('Relancer : npm run embed:ciqual');
+  process.exit(1);
+}
 
-const ingredients = lines.map((line) => {
-  const start = line.indexOf('VALUES (') + 'VALUES ('.length;
-  const end = line.lastIndexOf(');');
-  const tuple = line.slice(start, end);
-  const values = parseValueTuple(tuple);
-  const row = Object.fromEntries(COLUMNS.map((col, idx) => [col, values[idx]]));
-  return toIngredient(row);
-});
+// Le fichier de vecteurs n'est pas dans git : sur un poste où il manque, on le recalcule ici,
+// à la version du manifeste. Plusieurs minutes, et le modèle est téléchargé la première fois.
+if (!hasVectors(index)) {
+  console.log('Vecteurs de recherche absents sur ce poste : calcul en cours (quelques minutes)…');
+  execFileSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'embed-ciqual.mjs')], { stdio: 'inherit' });
+}
+
+const ingredients = readCiqualRows().map(toIngredient);
 
 writeFileSync(OUT_PATH, JSON.stringify(ingredients));
 console.log(`${ingredients.length} ingrédients écrits dans ${OUT_PATH}`);

@@ -28,7 +28,9 @@ export default function RecipeDetailScreen() {
     const items = await Promise.all(
       recipeIngredients.map(async (ri) => {
         const ingredient = await getIngredientById(ri.ingredientId);
-        return ingredient ? { ingredient, quantityG: ri.quantityG, unitCount: ri.unitCount } : null;
+        return ingredient
+          ? { ingredient, quantityG: ri.quantityG, unitCount: ri.unitCount, isEstimated: ri.isEstimated }
+          : null;
       }),
     );
     const resolvedItems = items.filter((i): i is NonNullable<typeof i> => i !== null);
@@ -53,6 +55,16 @@ export default function RecipeDetailScreen() {
       <h1>{recipe.name}</h1>
       {recipe.description && <p>{recipe.description}</p>}
 
+      {recipe.sourceText && (
+        <section className="card">
+          <p className="card-label">
+            <MaskIcon src="/icons/common/ia.svg" color="currentColor" size="1rem" /> Plat créé par l'IA à partir de
+            cette description
+          </p>
+          <p className="ai-comment">« {recipe.sourceText} »</p>
+        </section>
+      )}
+
       <div className="recipe-badges">
         {isPrepared ? (
           <span className="badge">🍱 Plat tout prêt</span>
@@ -69,9 +81,11 @@ export default function RecipeDetailScreen() {
         <section className="card">
           <p className="card-label">Ingrédients</p>
           <ul className="ingredient-list">
-            {items.map(({ ingredient, quantityG, unitCount }) => (
+            {items.map(({ ingredient, quantityG, unitCount, isEstimated }) => (
               <li key={ingredient.id}>
-                {ingredient.name} — {formatQuantity({ quantityG, unitCount }, ingredient)}
+                {ingredient.name} — {isEstimated && '≈ '}
+                {formatQuantity({ quantityG, unitCount }, ingredient)}
+                {isEstimated && <span className="quantity-note"> · estimé</span>}
               </li>
             ))}
           </ul>

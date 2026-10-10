@@ -3,7 +3,7 @@ import { db, type Ingredient } from './schema';
 const CIQUAL_SEED_KEY = 'ciqualSeededAt';
 const CIQUAL_PORTIONS_KEY = 'ciqualPortionsSeededAt';
 
-async function fetchCiqual(): Promise<Ingredient[] | null> {
+export async function fetchCiqual(): Promise<Ingredient[] | null> {
   const res = await fetch('/seed/ciqual.json');
   return res.ok ? res.json() : null;
 }

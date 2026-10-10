@@ -38,7 +38,9 @@ src/
 ├── components/       Composants partagés entre écrans
 ├── hooks/            Lectures réactives (useProfile, useWeekSlots)
 ├── store/            État d'interface Zustand (useUiStore)
-├── services/         Logique pure et accès externes (nutrition, Open Food Facts, backup)
+├── services/         Logique pure et accès externes (nutrition, Open Food Facts, backup, IA)
+│   └── embedding/    Client du worker de recherche intelligente, types des messages
+├── workers/          embedding.worker.ts : modèle d'embeddings et vecteurs Ciqual, hors du fil d'interface
 ├── db/               schema.ts (tables + types), seed.ts, repositories/
 ├── utils/            date.ts
 └── index.css         Tout le CSS de l'application
@@ -67,8 +69,21 @@ screens ─┬─> components ─┐
 
 [main.tsx](../../src/main.tsx) lance `ensureCiqualSeed()` sans l'attendre : au premier lancement, `public/seed/ciqual.json` est chargé dans la table `ingredients`, et une clé `ciqualSeededAt` dans `appMeta` empêche de recommencer. Ce JSON est généré depuis `assets/ciqual.sql` par `scripts/convert-ciqual.mjs`, exécuté automatiquement avant `dev` et `build`.
 
+## Recherche intelligente (embeddings sur l'appareil)
+
+Comportement spécifié dans la capacité OpenSpec `on-device-food-embedding`.
+
+- **Vecteurs Ciqual** : précalculés sur le poste de développement (voir [commands.md](../workflow/commands.md) ; le manifeste est dans git, le binaire est recalculé là où il manque), servis en statique : `public/seed/ciqual-vectors.bin` (int8, `count × dim` octets) et `ciqual-index.json` (version, modèle, préfixe, identifiants dans l'ordre des vecteurs). L'appareil ne vectorise jamais la base.
+- **Modèle** : `Xenova/multilingual-e5-small` en q8, téléchargé **depuis Hugging Face par l'appareil**, sur clic, par `@huggingface/transformers`. Il n'est pas dans les fichiers de l'application (trop lourd pour Cloudflare, 25 Mio par fichier).
+- **Moteur WebAssembly** d'ONNX : servi par l'application depuis `/ort/` (copié par `scripts/copy-ort.mjs`), jamais depuis un CDN. C'est la variante simple (13,6 Mio) : la variante par défaut de la bibliothèque dépasse 25 Mio, et un greffon de `vite.config.ts` retire du build la copie que Vite embarquerait.
+- **Worker** [workers/embedding.worker.ts](../../src/workers/embedding.worker.ts) : détient le modèle et les vecteurs, répond aux messages `status`, `prepare`, `search`, `remove`. Recherche = produit scalaire de la requête contre tous les vecteurs.
+- **Client** [services/embedding/embeddingClient.ts](../../src/services/embedding/embeddingClient.ts) : `acquireEmbedding` (un écran consommateur ; le worker s'arrête au dernier retiré, ce qui libère ≈ 120 Mo), `getEmbeddingStatus`, `prepareEmbedding`, `searchFoods`, `removeEmbedding`. `searchFoods` rend des `Ingredient` lus par le repository.
+- **Caches** (Cache API) : `transformers-cache` (modèle, géré par la bibliothèque), `mealing-embedding` (manifeste et vecteurs), `ort-engine` (moteur, règle Workbox `CacheFirst`). Une fois remplis, la recherche fonctionne hors ligne.
+- **Stockage persistant** demandé au téléchargement ; un refus ne bloque rien. iOS peut purger le cache : la présence du modèle est retestée à chaque usage.
+
 ## PWA et réseau
 
 - Manifest fourni tel quel dans [public/manifest.webmanifest](../../public/manifest.webmanifest) (`manifest: false` côté plugin). Couleur de thème `#2ECC71`.
 - Workbox met en cache `js, css, html, png, svg, woff2`. Open Food Facts est en `NetworkFirst`, cache d'un jour.
-- Deux appels réseau applicatifs : [services/openFoodFacts.ts](../../src/services/openFoodFacts.ts) et [services/aiReview.ts](../../src/services/aiReview.ts) (1min.AI, sur clic explicite uniquement). La clé 1min.AI est saisie dans les Réglages et reste dans `appMeta` ; elle n'est jamais dans le bundle.
+- Trois origines réseau applicatives : Open Food Facts ([services/openFoodFacts.ts](../../src/services/openFoodFacts.ts)), 1min.AI ([services/aiClient.ts](../../src/services/aiClient.ts), seul point d'appel, utilisé par `aiReview.ts` et `dishFromText.ts`, sur clic explicite uniquement) et Hugging Face (téléchargement du modèle par le worker, sur clic). La clé 1min.AI est saisie dans les Réglages et reste dans `appMeta` ; elle n'est jamais dans le bundle.
+- Les `.wasm`, `.bin` et `.json` ne sont pas précachés : ils ne sont demandés que par qui utilise la recherche intelligente.

@@ -26,6 +26,8 @@ Dans [src/components/](../../src/components/), export par défaut.
 | `FavoriteButton` | `name`, `isFavorite`, `onToggle` | Cœur d'un plat en `.icon-button`, `aria-pressed` ; liste des plats et fenêtre du planning |
 | `AiReviewModal` | `title`, `text`, `score?`, `isOutdated?`, `dayScores?`, `isError?`, `showSettingsLink?`, `onClose` | Lecture d'un avis de l'IA, d'un bilan de semaine ou d'un message d'échec |
 | `HoldToDeleteButton` | `onConfirm`, `label` | Suppression par appui maintenu de 700 ms |
+| `EmbeddingSetup` | `onReady` | Téléchargement accompagné du modèle de recherche intelligente : annonce de la taille, `progress`, étape, échec avec « Réessayer ». Se place dans un `fieldset.ingredient-picker` |
+| `CandidatePickerModal` | `open`, `label`, `candidates`, `selectedId?`, `onPick`, `onSearchElsewhere`, `onCancel` | Choix d'un aliment parmi les candidats d'un ingrédient décrit ; renvoie vers `IngredientPickerModal` si aucun ne convient |
 
 `IconNumberField` et `DifficultyPicker` sont pour l'instant **locaux** à `RecipeFormScreen.tsx`. Dès qu'un second écran en a besoin, les déplacer dans `src/components/` au lieu de les recopier.
 
@@ -36,9 +38,11 @@ Dans [src/components/](../../src/components/), export par défaut.
 | `.button-primary` | Plein vert, texte blanc, icône + texte | Action principale d'un écran, en bas. **Création** |
 | `.button-primary.button-primary--neutral` | Fond gris translucide | Même place, pour **enregistrer une modification** |
 | `.button-primary.button-primary--danger` | Plein rouge, texte blanc | Action destructive d'ensemble (« Tout supprimer »), toujours suivie d'un `ConfirmModal` |
+| `.button-primary:disabled` | Atténué | Validation impossible tant que la saisie est incomplète |
 | `.shop-toggle` | Disque `2.25rem`, gris, vert en `.active` | Bouton de courses d'un article ; mêmes teintes que la pastille du planning |
 | `.icon-button` | Sans fond ni bordure | Action secondaire par icône seule (modifier, supprimer, retirer) |
 | `.fab` | Disque vert flottant | Création depuis une liste (voir [layout.md](layout.md#bouton-flottant)) |
+| `.fab.fab--second` | Disque neutre à bordure, au-dessus du premier | Seconde façon de créer depuis la même liste |
 | `.button-row` | Rangée de boutons ou liens à bordure, largeur égale | Actions secondaires côte à côte |
 | `.detail-actions` | Rangée d'`.icon-button` | Actions d'un écran de détail |
 | `.ingredient-add` | Carré `2.25rem` à bordure | Bouton « + » en tête d'une zone encadrée |
@@ -74,7 +78,9 @@ Toutes : boutons de largeur égale (`flex: 1`), `gap: 0.5rem`, état porté par 
 | `.recipe-list` > `.recipe-list-item` > `.recipe-list-link` | Liste d'éléments cliquables avec action à droite |
 | `.recipe-name`, `.recipe-meta` | Titre et ligne de métadonnées d'un élément |
 | `.recipe-badges` | Ligne de badges et d'informations d'un détail |
-| `.badge`, `.badge--healthy` | Étiquette en pilule, variante verte |
+| `.badge`, `.badge--healthy`, `.badge--warn` | Étiquette en pilule, variante verte, variante orange (« à vérifier ») |
+| `.progress-bar` | `<progress>` natif pleine largeur, teinte verte ; sans `value`, attente indéterminée |
+| `.dish-line` | Ligne d'un plat analysé : plusieurs `.ingredient-row`, `.recipe-badges`, `.mode-toggle` empilés, séparés par un filet |
 | `.ingredient-list` > `.ingredient-row` (+ `.ingredient-row-name`) | Lignes éditables : nom, quantité, unité, retrait |
 | `.card` + `.card-label` | Bloc encadré avec petit intitulé |
 | `.nutrition-table` | Tableau de valeurs, première colonne à gauche, les autres à droite |
@@ -109,6 +115,8 @@ Zone de quantité de la fenêtre d'ajout d'ingrédient : `.mode-toggle` (unité 
 Saisie libre de la même fenêtre : `.mode-toggle` en tête (Rechercher / Saisie libre), puis `.picker-free` (colonne qui défile si la fenêtre est trop basse) contenant le nom en `.picker-search`, la quantité en `.picker-quantity`, une `.quantity-note` et `.nutrition-fields` (quatre `.picker-quantity` sur deux colonnes). Une recherche sans résultat propose la saisie libre par un `button.picker-result` sous l'`.empty-state`. La note `.picker-result-note` vaut « personnel » pour un aliment saisi librement.
 
 Avis de l'IA au planning : `.day-column-title` (nom du jour + deux `.icon-button.ai-button`), `.ai-button.loading` (couleur en boucle pendant la requête, fixe sous `prefers-reduced-motion`), `.ai-button:disabled` (icône effacée), `.day-column--score-0` à `--score-10` (fond du rouge au vert par l'orange), `.ai-comment` et `.ai-day-score` dans la fenêtre.
+
+Plat décrit en texte libre (`DishFromTextScreen`) : `li.dish-line` contient une `.ingredient-row` (aliment retenu, crayon, corbeille), une seconde (quantité précédée de `≈` si estimée, calories, champ de poids), des `.badge` (« estimé », `.badge--warn` « à vérifier ») et, pour une ligne estimée, un `.mode-toggle` Petite / Normale / Grande. Les messages d'état portent `role="status"`, les échecs `role="alert"`, en `.quantity-note`.
 
 ## Supprimer : quel geste
 
