@@ -40,6 +40,7 @@ Ce fichier ne contient que l'essentiel. Le détail est dans la base de connaissa
 - `spec.md` décrit la **cible** du produit ; `openspec/specs/` décrit le **comportement réellement livré**. En cas de conflit, le code et OpenSpec priment.
 - `_bmad-output/project-context.md` est **obsolète** (ancienne version React Native + Spring Boot) : ne pas s'en servir. `mealing-backend/` et `tools/` sont des restes de cette époque.
 - `assets/ciqual.sql` et les vecteurs de recherche vont ensemble : après toute modification du SQL, `npm run embed:ciqual` puis commiter `public/seed/ciqual-index.json`, sinon `dev` et `build` échouent. `ciqual-vectors.bin` n'est pas dans git : il est recalculé au premier `dev` ou `build` d'un poste où il manque (quelques minutes).
+- Hugging Face rejette (404 sans CORS) les requêtes dont le référent est un site `*.workers.dev` : tout appel vers lui passe par `fetchWithoutReferrer` du worker d'embedding. Invisible en local, bloquant une fois déployé.
 - Neuf écrans sont encore des coquilles « À venir » (voir [routing.md](docs/architecture/routing.md)). `framer-motion`, `recharts`, `pdf-lib` et `@zxing/browser` sont installés mais pas encore utilisés.
 - Sur ce poste Windows, Python se lance avec `py`.
 

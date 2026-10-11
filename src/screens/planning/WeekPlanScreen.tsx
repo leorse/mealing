@@ -23,6 +23,7 @@ import MaskIcon from '../../components/MaskIcon';
 import MealPickerModal from '../../components/MealPickerModal';
 import HoldToDeleteButton from '../../components/HoldToDeleteButton';
 import AiReviewModal from '../../components/AiReviewModal';
+import WeekAiModal from '../../components/WeekAiModal';
 import type { MealSlot } from '../../db/schema';
 
 function slotCalories(slot: MealSlot): number {
@@ -47,6 +48,7 @@ export default function WeekPlanScreen() {
   const [pendingDates, setPendingDates] = useState<string[]>([]);
   const [isWeekPending, setIsWeekPending] = useState(false);
   const [reviewView, setReviewView] = useState<ReviewView | null>(null);
+  const [isWeekAiOpen, setIsWeekAiOpen] = useState(false);
 
   if (profile === PROFILE_LOADING || profile === undefined) return null;
 
@@ -115,11 +117,11 @@ export default function WeekPlanScreen() {
         <button
           type="button"
           className={`ai-button ${isWeekPending ? 'loading' : ''}`}
-          disabled={isBusy || filledDates.length === 0}
+          disabled={isBusy}
           aria-busy={isWeekPending}
-          onClick={() => review(filledDates, true)}
-          aria-label="Demander l'avis de l'IA sur la semaine"
-          title="Demander l'avis de l'IA sur la semaine"
+          onClick={() => setIsWeekAiOpen(true)}
+          aria-label="IA : bilan ou remplissage de la semaine"
+          title="IA : bilan ou remplissage de la semaine"
         >
           <MaskIcon src="/icons/common/ia.svg" color="currentColor" />
         </button>
@@ -251,6 +253,17 @@ export default function WeekPlanScreen() {
           mealType={editing.mealType}
           slot={editing}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {isWeekAiOpen && (
+        <WeekAiModal
+          weekStart={selectedWeekStart}
+          slots={slots}
+          goal={{ targetCalories: target, ...computeMacroTargets(target, profile), goal: profile.goal }}
+          canReview={filledDates.length > 0}
+          onRequestReview={() => review(filledDates, true)}
+          onClose={() => setIsWeekAiOpen(false)}
         />
       )}
 

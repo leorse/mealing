@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useOnce } from '../../hooks/useOnce';
 import { getAiSettings } from '../../db/repositories/settingsRepository';
 import { create } from '../../db/repositories/recipeRepository';
 import CandidatePickerModal from '../../components/CandidatePickerModal';
@@ -79,10 +80,8 @@ export default function DishFromTextScreen() {
   const [replacingKey, setReplacingKey] = useState<string | null>(null);
   const [searchingKey, setSearchingKey] = useState<string | null>(null);
 
-  // Vrai dès le clic sur une action principale : le bouton se grise aussitôt, avant toute attente.
-  const [isBusy, setIsBusy] = useState(false);
-  // Le même verrou, lisible sans attendre le rendu : deux clics dans la même image ne passent pas.
-  const busyRef = useRef(false);
+  // « Analyser » et « Valider » se grisent dès le clic ; un second clic est ignoré.
+  const { isBusy, once } = useOnce();
 
   const abortRef = useRef<AbortController | null>(null);
   // Décomposition gardée après un échec du tri : la relance ne refait que celui-ci.
@@ -138,19 +137,6 @@ export default function DishFromTextScreen() {
       }
       else setFailure(failureOf('INVALID_RESPONSE'));
       setPhase('INPUT');
-    }
-  }
-
-  /** Exécute une action principale une seule fois à la fois, bouton grisé pendant toute sa durée. */
-  async function once(action: () => Promise<void>) {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    setIsBusy(true);
-    try {
-      await action();
-    } finally {
-      busyRef.current = false;
-      setIsBusy(false);
     }
   }
 

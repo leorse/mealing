@@ -1,4 +1,5 @@
-import { db, type WeekPlan, type MealSlot, type ShoppingItemState, type AiDayReview } from '../schema';
+import { db, type WeekPlan, type MealSlot, type Recipe, type ShoppingItemState, type AiDayReview } from '../schema';
+import type { RecipeIngredientInput, RecipeInput } from './recipeRepository';
 
 /** Lecture seule — n'écrit jamais, safe à utiliser dans une useLiveQuery. */
 export async function getWeek(weekStart: string): Promise<WeekPlan | undefined> {
@@ -39,6 +40,41 @@ export async function addSlotForWeek(
 ): Promise<MealSlot> {
   const weekPlan = await ensureWeek(weekStart);
   return addSlot(weekPlan.id!, data);
+}
+
+/** Un plat créé par le remplissage de la semaine, et les créneaux où le placer. */
+export interface GeneratedDish {
+  recipe: RecipeInput;
+  ingredients: RecipeIngredientInput[];
+  /** Calories d'une portion, figées dans chaque entrée du planning comme pour un choix à la main. */
+  calories: number;
+  slots: { slotDate: string; mealType: MealSlot['mealType'] }[];
+}
+
+/**
+ * Crée les plats du remplissage et leurs entrées au planning, en une transaction : tout ou rien,
+ * pour ne jamais laisser un plat sans son créneau. Les entrées ne partent pas aux courses.
+ */
+export async function addGeneratedMeals(weekStart: string, dishes: GeneratedDish[]): Promise<void> {
+  await db.transaction('rw', [db.recipes, db.recipeIngredients, db.weekPlans, db.mealSlots], async () => {
+    const weekPlan = await ensureWeek(weekStart);
+    const now = new Date().toISOString();
+    for (const dish of dishes) {
+      const recipe: Recipe = { ...dish.recipe, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
+      await db.recipes.add(recipe);
+      await db.recipeIngredients.bulkAdd(dish.ingredients.map((i) => ({ ...i, id: crypto.randomUUID(), recipeId: recipe.id! })));
+      for (const slot of dish.slots) {
+        await addSlot(weekPlan.id!, {
+          ...slot,
+          recipeId: recipe.id,
+          freeLabel: recipe.name,
+          portions: 1,
+          isDeviation: false,
+          caloriesOverride: dish.calories,
+        });
+      }
+    }
+  });
 }
 
 export async function updateSlot(slotId: string, data: Partial<MealSlot>): Promise<void> {

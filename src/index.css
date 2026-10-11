@@ -1246,6 +1246,63 @@ body {
   opacity: 0.5;
 }
 
+/* Grille du remplissage de la semaine : une colonne d'intitulés, sept jours. Chaque ligne est en
+   `display: contents` pour que ses cases se placent directement dans la grille. */
+.fill-grid {
+  display: grid;
+  grid-template-columns: auto repeat(7, minmax(0, 1fr));
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.fill-grid-row {
+  display: contents;
+}
+
+.fill-grid-head,
+.fill-grid-label {
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+
+.fill-grid-head {
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.fill-grid-label {
+  padding-right: 0.2rem;
+}
+
+/* Case écartée : fond clair, vide. Retenue : verte avec une coche. Déjà prévue : foncée, un point,
+   verrouillée. Le signe redit l'état pour qui ne distingue pas les couleurs. */
+.fill-cell {
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, canvasText 20%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, canvasText 6%, transparent);
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+}
+
+/* Deux actions principales côte à côte (« Nouvelle proposition », « Résultats »), même largeur. */
+.modal-actions > .button-primary {
+  flex: 1;
+}
+
+.fill-cell.selected {
+  background: #2ecc71;
+  border-color: #2ecc71;
+  color: #fff;
+}
+
+.fill-cell:disabled:not(.selected) {
+  background: color-mix(in srgb, canvasText 30%, transparent);
+  border-color: transparent;
+}
+
 /* Détail technique d'un échec, dans un <details> : texte brut, sélectionnable pour être copié. */
 .error-detail {
   margin: 0.4rem 0 0;

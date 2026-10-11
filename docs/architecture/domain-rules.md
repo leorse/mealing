@@ -129,6 +129,19 @@ Comportement spécifié dans la capacité OpenSpec `dish-from-text`. Tout est da
 - **Transmis à l'IA** : la description, puis les ingrédients qui en sont issus et les noms et identifiants des aliments candidats. Jamais le profil ni le planning.
 - **Échecs** : `DishErrorCode` = codes de `AiError` + `NO_FOOD`, messages par `dishErrorMessage` ; les échecs de la recherche locale sont des `EmbeddingError`.
 
+## Remplissage de la semaine
+
+Comportement spécifié dans la capacité OpenSpec `ai-week-fill`. Service [services/weekFill.ts](../../src/services/weekFill.ts), fenêtre [components/WeekAiModal.tsx](../../src/components/WeekAiModal.tsx), ouverte par l'icône IA de l'en-tête du planning (onglets « Bilan » et « Remplir la semaine »).
+
+- **Trois demandes à 1min.AI** : `requestProposals` (un nom et une description avec quantités par créneau retenu), puis `analyze` de `dishFromText` sur les descriptions (décomposition et tri). Une seule analyse jusqu'à `MAX_DISHES_PER_ANALYSIS` (21) plats ; au-delà, des tranches successives.
+- **Créneaux** : petit-déjeuner, déjeuner, dîner (`FILL_MEAL_TYPES`), jamais la collation. Un créneau qui a au moins une entrée (plat ou écart) est verrouillé ; les autres sont retenus par défaut et s'écartent d'un appui.
+- **Semaine complète transmise** (`buildWeekContext`, `buildFillPrompt`) : chaque jour avec tous ses repas déjà prévus (créneau, nom, kcal, écart, collation comprise), son total, et ses créneaux vides écartés, signalés comme « pris par l'utilisateur, contenu inconnu ». Plus l'objectif (calories, macros, but) et les préférences culinaires si elles existent. Jours nommés, jamais datés ; aucune donnée d'identité.
+- **Lecture des propositions** (`parseProposals`) : enveloppe illisible ou aucune proposition → `AiError('INVALID_RESPONSE')` ; créneau absent, en double ou incomplet → signalé « sans proposition », les autres sont gardés.
+- **Création** (`generate`) : propositions de même nom et même description regroupées (un plat, plusieurs créneaux) ; plat maison d'une portion, nom de la proposition, `sourceText` = description, toutes les lignes `isEstimated`, lignes sans aliment omises ; plat sans ligne → échec de cette proposition seule. Calories de l'entrée = `computeRecipeNutrition` d'une portion.
+- **Écriture** : `planningRepository.addGeneratedMeals`, une transaction — tout ou rien. Entrées `portions: 1`, sans pastille de courses. Rien n'est écrit avant la fin des analyses ; une annulation ou un échec d'ensemble ne laisse rien.
+- **Relance** : un `ChoiceStepError` garde son `checkpoint` tant que la liste n'a pas changé ; les propositions en échec restent dans la liste pour une nouvelle tentative.
+- **Verrou** : « Proposer des plats » et « Créer et ajouter au planning » passent par `useOnce` ([hooks/useOnce.ts](../../src/hooks/useOnce.ts)), comme les actions de l'écran « Décrire un plat ».
+
 ## Recherche d'ingrédient
 
 Comportement spécifié dans la capacité OpenSpec `ingredient-search`. Classement dans [services/ingredientSearch.ts](../../src/services/ingredientSearch.ts) (fonctions pures), appelé par `ingredientRepository.search`.

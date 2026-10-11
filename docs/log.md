@@ -9,6 +9,10 @@ timestamp: 2026-10-04T00:00:00Z
 
 Une ligne par changement, la plus récente en haut.
 
+- **2026-10-11** — Remplissage de la semaine par l'IA : `services/weekFill.ts`, `WeekAiModal` (onglets Bilan / Remplir), `planningRepository.addGeneratedMeals`, préférences culinaires (`foodPreferences`, `getFoodPreferences`, `saveFoodPreferences`), hook `useOnce`, classes `.fill-grid`, `.fill-cell`.
+- **2026-10-10** — Requêtes vers Hugging Face sans référent (`fetchWithoutReferrer`) : le site déployé en `*.workers.dev` recevait un 404 sans CORS ; piège ajouté à CLAUDE.md.
+- **2026-10-10** — Téléchargement du modèle repris par le worker (`downloadModel`) : écriture au fil de l'eau dans le cache de la bibliothèque, détail d'échec par fichier et par serveur, test de joignabilité.
+- **2026-10-10** — Diagnostic de la recherche intelligente : `EmbeddingError.detail` (étape, erreur d'origine, stockage, navigateur) affiché dans un `<details>` « Détail technique » par `EmbeddingSetup` et `DishFromTextScreen`, classe `.error-detail`.
 - **2026-10-10** — Vecteurs Ciqual : `ciqual-vectors.bin` sorti de git et recalculé par `seed:ciqual` quand il manque, à version constante ; seul `ciqual-index.json` est versionné.
 - **2026-10-10** — Origine des plats : `Recipe.sourceText`, icône `ia` dans la liste des plats, description d'origine au détail ; verrou anti double clic de l'écran « Décrire un plat ».
 - **2026-10-10** — Plat décrit en texte libre : `services/dishFromText.ts` (analyse par lot), `services/aiClient.ts` (client 1min.AI partagé), route `/recipes/describe`, `DishFromTextScreen`, `CandidatePickerModal`, `RecipeIngredient.isEstimated`, `isHealthyFromItems`, classes `.fab--second`, `.badge--warn`, `.dish-line`.

@@ -1,6 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { clearAiApiKey, getAiSettings, saveAiSettings } from '../../db/repositories/settingsRepository';
+import {
+  FOOD_PREFERENCES_MAX_LENGTH,
+  clearAiApiKey,
+  getAiSettings,
+  getFoodPreferences,
+  saveAiSettings,
+  saveFoodPreferences,
+} from '../../db/repositories/settingsRepository';
 import { AI_MODELS } from '../../services/aiReview';
 import MaskIcon from '../../components/MaskIcon';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -10,6 +17,9 @@ import type { EmbeddingStatus } from '../../services/embedding/types';
 
 export default function SettingsScreen() {
   const settings = useLiveQuery(() => getAiSettings(), []);
+  const storedPreferences = useLiveQuery(() => getFoodPreferences(), []);
+  // null tant que l'utilisateur n'a pas touché au champ : on affiche alors la valeur enregistrée.
+  const [preferences, setPreferences] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
@@ -40,7 +50,7 @@ export default function SettingsScreen() {
     await refreshEmbedding();
   }
 
-  if (settings === undefined) return null;
+  if (settings === undefined || storedPreferences === undefined) return null;
 
   const hasKey = settings.apiKey !== undefined;
   const selectedModel = model ?? settings.model;
@@ -52,7 +62,9 @@ export default function SettingsScreen() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     await saveAiSettings({ apiKey: apiKey.trim() || undefined, model: selectedModel });
+    if (preferences !== null) await saveFoodPreferences(preferences);
     setApiKey('');
+    setPreferences(null);
     setIsSaved(true);
   }
 
@@ -113,6 +125,29 @@ export default function SettingsScreen() {
             </button>
           </div>
         )}
+      </fieldset>
+
+      <fieldset className="ingredient-picker">
+        <legend>Préférences culinaires</legend>
+
+        <label>
+          Ce que tu aimes, ce que tu évites
+          <textarea
+            rows={3}
+            maxLength={FOOD_PREFERENCES_MAX_LENGTH}
+            value={preferences ?? storedPreferences}
+            placeholder="Par exemple : je n'aime pas les champignons, des plats simples, pas de fromage râpé."
+            onChange={(e) => {
+              setPreferences(e.target.value);
+              setIsSaved(false);
+            }}
+          />
+        </label>
+
+        <p className="quantity-note">
+          Ce texte est transmis à 1min.AI quand tu demandes à l'IA de remplir ta semaine, et seulement dans ce cas.
+          {` ${(preferences ?? storedPreferences).length} / ${FOOD_PREFERENCES_MAX_LENGTH} caractères.`}
+        </p>
       </fieldset>
 
       <fieldset className="ingredient-picker">
