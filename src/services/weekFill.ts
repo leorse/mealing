@@ -4,7 +4,7 @@ import type { MealSlot } from '../db/schema';
 import { addGeneratedMeals, type GeneratedDish } from '../db/repositories/planningRepository';
 import { getFoodPreferences, FOOD_PREFERENCES_MAX_LENGTH } from '../db/repositories/settingsRepository';
 import { AiError, chat, extractJsonObject, type AiErrorCode } from './aiClient';
-import type { ReviewGoal } from './aiReview';
+import { loadReviewDays, type ReviewDay, type ReviewGoal } from './aiReview';
 import { analyze, type AnalysisCheckpoint, type AnalysisStage } from './dishFromText';
 import { computeRecipeNutrition, isHealthyFromItems } from './nutrition';
 import { fromIsoDate } from '../utils/date';
@@ -19,6 +19,9 @@ export type FillMealType = (typeof FILL_MEAL_TYPES)[number];
 
 /** Plats analysés ensemble au plus ; au-delà, la création enchaîne plusieurs analyses. */
 export const MAX_DISHES_PER_ANALYSIS = 21;
+
+/** Longueur maximale des indications ponctuelles saisies pour une demande. */
+export const FILL_HINTS_MAX_LENGTH = 300;
 
 export type FillStage = 'PROPOSE' | AnalysisStage | 'WRITE';
 
@@ -37,7 +40,14 @@ export interface Proposal {
 /** Ce qu'une journée porte déjà, pour que l'IA ne la surcharge pas. */
 export interface WeekDayContext {
   date: string;
-  meals: { mealType: MealSlot['mealType']; name: string; calories: number; isDeviation: boolean }[];
+  meals: {
+    mealType: MealSlot['mealType'];
+    name: string;
+    calories: number;
+    isDeviation: boolean;
+    /** Composition d'un plat maison, quand on la transmet. */
+    ingredients?: string[];
+  }[];
   /** Créneaux vides que l'utilisateur a écartés : il les gère lui-même. */
   skipped: FillMealType[];
 }
@@ -60,19 +70,50 @@ export function slotLabel(slot: FillSlot): string {
   return `${mealTypeLabel(slot.mealType)} du ${format(fromIsoDate(slot.date), 'EEEE d', { locale: fr })}`;
 }
 
-/** La semaine telle que l'IA doit la voir : tous les repas déjà prévus, jour par jour, et les créneaux écartés. */
-export function buildWeekContext(dates: string[], slots: MealSlot[], retained: FillSlot[]): WeekDayContext[] {
+/**
+ * La semaine telle que l'IA doit la voir : les repas déjà prévus, jour par jour, et les créneaux écartés.
+ * Avec `includeWeek`, toute la semaine et la composition des plats maison ; sans, seulement les jours
+ * qui portent un créneau retenu, sans composition.
+ */
+export async function buildWeekContext(
+  dates: string[],
+  slots: MealSlot[],
+  retained: FillSlot[],
+  includeWeek: boolean,
+): Promise<WeekDayContext[]> {
   const retainedKeys = new Set(retained.map(slotKey));
-  return dates.map((date) => {
+  const retainedDates = new Set(retained.map((slot) => slot.date));
+  const kept = includeWeek ? dates : dates.filter((date) => retainedDates.has(date));
+
+  // La composition est un plus : si elle ne se charge pas, la demande part avec les noms seuls.
+  let loaded: ReviewDay[] = [];
+  if (includeWeek) {
+    try {
+      loaded = await loadReviewDays(kept.map((date) => ({ date, slots: slots.filter((s) => s.slotDate === date) })));
+    } catch {
+      loaded = [];
+    }
+  }
+
+  return kept.map((date) => {
     const daySlots = slots.filter((s) => s.slotDate === date).sort((a, b) => mealTypeOrder(a.mealType) - mealTypeOrder(b.mealType));
+    const withComposition = loaded.find((day) => day.date === date)?.meals;
     return {
       date,
-      meals: daySlots.map((s) => ({
-        mealType: s.mealType,
-        name: s.freeLabel ?? '',
-        calories: s.caloriesOverride ?? 0,
-        isDeviation: s.isDeviation,
-      })),
+      meals: withComposition
+        ? withComposition.map((meal) => ({
+            mealType: meal.mealType,
+            name: meal.name,
+            calories: meal.calories,
+            isDeviation: meal.isDeviation,
+            ingredients: meal.ingredients?.map((i) => i.name),
+          }))
+        : daySlots.map((s) => ({
+            mealType: s.mealType,
+            name: s.freeLabel ?? '',
+            calories: s.caloriesOverride ?? 0,
+            isDeviation: s.isDeviation,
+          })),
       skipped: FILL_MEAL_TYPES.filter(
         (type) => !daySlots.some((s) => s.mealType === type) && !retainedKeys.has(slotKey({ date, mealType: type })),
       ),
@@ -89,7 +130,10 @@ const GOAL_LABELS: Record<ReviewGoal['goal'], string> = {
 function describeDay(day: WeekDayContext): string {
   const total = day.meals.reduce((sum, meal) => sum + meal.calories, 0);
   const meals = day.meals.map(
-    (meal) => `${mealTypeLabel(meal.mealType).toLowerCase()} « ${meal.name} » ${meal.calories} kcal${meal.isDeviation ? ' (écart)' : ''}`,
+    (meal) =>
+      `${mealTypeLabel(meal.mealType).toLowerCase()} « ${meal.name} » ${meal.calories} kcal${meal.isDeviation ? ' (écart)' : ''}${
+        meal.ingredients?.length ? ` (avec : ${meal.ingredients.join(', ')})` : ''
+      }`,
   );
   const skipped = day.skipped.map((type) => `${mealTypeLabel(type).toLowerCase()} pris par l'utilisateur sans proposition, contenu inconnu`);
   const content = [...meals, ...skipped];
@@ -107,13 +151,18 @@ export function buildFillPrompt({
   week,
   goal,
   preferences,
+  hints = '',
+  includeWeek = true,
 }: {
   slots: FillSlot[];
   week: WeekDayContext[];
   goal: ReviewGoal;
   preferences: string;
+  hints?: string;
+  includeWeek?: boolean;
 }): string {
   const trimmed = preferences.trim().slice(0, FOOD_PREFERENCES_MAX_LENGTH);
+  const trimmedHints = hints.trim().slice(0, FILL_HINTS_MAX_LENGTH);
   return [
     'Tu es diététicien. Propose un plat pour chacun des repas listés plus bas, pour une personne.',
     '',
@@ -123,9 +172,15 @@ export function buildFillPrompt({
     ...week.map(describeDay),
     '',
     ...(trimmed ? ["Préférences de l'utilisateur, à respecter strictement :", `« ${trimmed} »`, ''] : []),
+    ...(trimmedHints ? ['Indications pour cette demande, à respecter strictement :', `« ${trimmedHints} »`, ''] : []),
     'Règles :',
     '- Un plat par repas listé, adapté au moment de la journée (un petit-déjeuner n\'est pas un dîner).',
     "- Des plats variés d'un repas à l'autre et d'un jour à l'autre, réalistes à cuisiner chez soi.",
+    ...(includeWeek
+      ? [
+          "- Ne repropose aucun plat ni ingrédient principal déjà présent dans la semaine ci-dessus, ni d'un repas à l'autre parmi tes propositions.",
+        ]
+      : []),
     '- "name" : un nom court de plat.',
     '- "description" : une phrase qui liste tous les ingrédients, chacun avec sa quantité pour une personne (en grammes, ou en unités : « 2 œufs », « une cuillère à soupe d\'huile »).',
     '- Aucune valeur nutritionnelle : ni calories, ni protéines, ni glucides, ni lipides.',
@@ -173,14 +228,18 @@ export interface ProposalRequest {
   slots: FillSlot[];
   week: WeekDayContext[];
   goal: ReviewGoal;
+  /** Indications ponctuelles de l'utilisateur, en plus de ses préférences. */
+  hints?: string;
+  /** La semaine entière est transmise (avec compositions) et ne doit pas être répétée. */
+  includeWeek?: boolean;
   signal?: AbortSignal;
 }
 
 /** Envoie la demande de propositions. Les préférences sont lues maintenant : une modification récente compte. */
-export async function requestProposals({ apiKey, model, slots, week, goal, signal }: ProposalRequest): Promise<ParsedProposals> {
+export async function requestProposals({ apiKey, model, slots, week, goal, hints, includeWeek, signal }: ProposalRequest): Promise<ParsedProposals> {
   if (!apiKey) throw new AiError('NO_KEY');
   const preferences = await getFoodPreferences();
-  const prompt = buildFillPrompt({ slots, week, goal, preferences });
+  const prompt = buildFillPrompt({ slots, week, goal, preferences, hints, includeWeek });
   return parseProposals(await chat({ apiKey, model, prompt, trace: 'Remplissage', signal }), slots);
 }
 

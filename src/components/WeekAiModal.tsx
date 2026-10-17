@@ -15,6 +15,7 @@ import {
   getEmbeddingStatus,
 } from '../services/embedding/embeddingClient';
 import {
+  FILL_HINTS_MAX_LENGTH,
   FILL_MEAL_TYPES,
   buildWeekContext,
   compareSlots,
@@ -87,6 +88,9 @@ export default function WeekAiModal({ weekStart, slots, goal, canReview, onReque
         ),
       ),
   );
+  // Propres à la demande : ni enregistrés, ni conservés à la fermeture de la fenêtre.
+  const [includeWeek, setIncludeWeek] = useState(true);
+  const [hints, setHints] = useState('');
   const [phase, setPhase] = useState<Phase>('GRID');
   const [stage, setStage] = useState<FillStage>('PROPOSE');
   const [proposals, setProposals] = useState<Proposal[]>([]);
@@ -152,8 +156,10 @@ export default function WeekAiModal({ weekStart, slots, goal, canReview, onReque
         apiKey: settings.apiKey,
         model: settings.model,
         slots: retained,
-        week: buildWeekContext(week.dates, week.slots, retained),
+        week: await buildWeekContext(week.dates, week.slots, retained, includeWeek),
         goal,
+        hints,
+        includeWeek,
         signal: controller.signal,
       });
       if (controller.signal.aborted) return;
@@ -291,10 +297,6 @@ export default function WeekAiModal({ weekStart, slots, goal, canReview, onReque
 
         {tab === 'FILL' && (phase === 'GRID' || phase === 'SETUP' || phase === 'PROPOSING') && (
           <div className="picker-free">
-            <p className="quantity-note">
-              En vert, les repas vides que l'IA remplira ; touche une case pour l'écarter ou la reprendre. Les repas
-              déjà prévus restent tels quels, et l'IA en tient compte.
-            </p>
 
             <div className="fill-grid" role="group" aria-label="Repas à remplir">
               <span />
@@ -333,6 +335,31 @@ export default function WeekAiModal({ weekStart, slots, goal, canReview, onReque
               {hasEmptySlot
                 ? `${retained.length} repas à proposer.`
                 : 'Tous les repas de la semaine sont déjà prévus : rien à remplir.'}
+            </p>
+
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={includeWeek}
+                disabled={phase !== 'GRID'}
+                onChange={(e) => setIncludeWeek(e.target.checked)}
+              />
+              Tenir compte du reste de la semaine
+            </label>
+
+            <label>
+              Indications complémentaires (facultatif)
+              <textarea
+                rows={2}
+                maxLength={FILL_HINTS_MAX_LENGTH}
+                value={hints}
+                disabled={phase !== 'GRID'}
+                placeholder="Par exemple : pas de riz, sans poisson."
+                onChange={(e) => setHints(e.target.value)}
+              />
+            </label>
+            <p className="quantity-note">
+              {` ${hints.length} / ${FILL_HINTS_MAX_LENGTH} caractères.`}
             </p>
 
             {phase === 'SETUP' && <EmbeddingSetup onReady={() => void once(propose)} />}
