@@ -15,6 +15,8 @@ interface MealPickerModalProps {
   mealType: MealSlot['mealType'];
   /** Entrée à modifier ; absent pour un ajout. */
   slot?: MealSlot;
+  /** Sans fenêtre autour : le contenu se loge dans une autre fenêtre (onglet « Remplacer »). */
+  embedded?: boolean;
   onClose: () => void;
 }
 
@@ -40,15 +42,15 @@ async function caloriesPerServingOf(recipe: Recipe): Promise<number> {
   return Math.round(perServing(computeRecipeNutrition(items), recipe.servings).calories);
 }
 
-export default function MealPickerModal({ open, slotDate, mealType, slot, onClose }: MealPickerModalProps) {
+export default function MealPickerModal({ open, slotDate, mealType, slot, embedded, onClose }: MealPickerModalProps) {
   const isEdit = slot !== undefined;
 
-  const [mode, setMode] = useState<Mode>('RECIPE');
+  const [mode, setMode] = useState<Mode>(slot?.isDeviation ? 'DEVIATION' : 'RECIPE');
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [query, setQuery] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [label, setLabel] = useState('');
-  const [calories, setCalories] = useState<number | ''>('');
+  const [selectedId, setSelectedId] = useState<string | null>(slot?.recipeId ?? null);
+  const [label, setLabel] = useState(slot?.freeLabel ?? '');
+  const [calories, setCalories] = useState<number | ''>(slot?.caloriesOverride ?? '');
   const [isSaving, setIsSaving] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -78,13 +80,13 @@ export default function MealPickerModal({ open, slotDate, mealType, slot, onClos
   }, [open, mode]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || embedded) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
+  }, [open, embedded, onClose]);
 
   if (!open) return null;
 
@@ -133,96 +135,104 @@ export default function MealPickerModal({ open, slotDate, mealType, slot, onClos
     onClose();
   }
 
+  const content = (
+    <>
+      <div className="mode-toggle">
+        <button
+          type="button"
+          className={mode === 'RECIPE' ? 'active' : ''}
+          onClick={() => setMode('RECIPE')}
+        >
+          Plat
+        </button>
+        <button
+          type="button"
+          className={mode === 'DEVIATION' ? 'active' : ''}
+          onClick={() => setMode('DEVIATION')}
+        >
+          Écart
+        </button>
+      </div>
+
+      {mode === 'RECIPE' ? (
+        <>
+          <input
+            ref={searchRef}
+            className="picker-search"
+            placeholder="Rechercher un plat…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+
+          <div className="picker-results">
+            {recipes.length === 0 ? (
+              <p className="empty-state">Aucun plat enregistré — créez-en un dans l'onglet Plats.</p>
+            ) : (
+              filtered.length === 0 && <p className="empty-state">Aucun plat ne correspond.</p>
+            )}
+
+            <ul className="picker-result-list">
+              {filtered.map((recipe) => (
+                <li key={recipe.id} className="picker-result-row">
+                  <button
+                    type="button"
+                    className={`picker-result ${selectedId === recipe.id ? 'selected' : ''}`}
+                    onClick={() => chooseRecipe(recipe)}
+                  >
+                    <span className="picker-result-name">{recipe.name}</span>
+                    <span className="picker-result-note">
+                      {recipe.kind === 'PREPARED' ? 'tout prêt' : 'maison'}
+                    </span>
+                  </button>
+                  <FavoriteButton
+                    name={recipe.name}
+                    isFavorite={Boolean(recipe.isFavorite)}
+                    onToggle={() => toggleFavorite(recipe)}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      ) : (
+        <label className="picker-quantity">
+          Nom de l'écart
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ex : Resto italien" />
+        </label>
+      )}
+
+      <label className="picker-quantity">
+        Calories (kcal)
+        <input
+          type="number"
+          min={1}
+          value={calories}
+          onChange={(e) => setCalories(e.target.value === '' ? '' : Number(e.target.value))}
+        />
+      </label>
+
+      <div className="modal-actions">
+        <button type="button" className="modal-button modal-button--no" onClick={onClose}>
+          Annuler
+        </button>
+        <button
+          type="button"
+          className="modal-button modal-button--yes"
+          disabled={!canConfirm || isSaving}
+          onClick={confirm}
+        >
+          {isEdit ? 'Enregistrer' : 'Ajouter'}
+        </button>
+      </div>
+    </>
+  );
+
+  if (embedded) return content;
+
   return (
     <div className="modal-overlay">
       <div className="modal-card modal-card--picker" role="dialog" aria-modal="true" aria-label="Ajouter un repas">
-        <div className="mode-toggle">
-          <button
-            type="button"
-            className={mode === 'RECIPE' ? 'active' : ''}
-            onClick={() => setMode('RECIPE')}
-          >
-            Plat
-          </button>
-          <button
-            type="button"
-            className={mode === 'DEVIATION' ? 'active' : ''}
-            onClick={() => setMode('DEVIATION')}
-          >
-            Écart
-          </button>
-        </div>
-
-        {mode === 'RECIPE' ? (
-          <>
-            <input
-              ref={searchRef}
-              className="picker-search"
-              placeholder="Rechercher un plat…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-
-            <div className="picker-results">
-              {recipes.length === 0 ? (
-                <p className="empty-state">Aucun plat enregistré — créez-en un dans l'onglet Plats.</p>
-              ) : (
-                filtered.length === 0 && <p className="empty-state">Aucun plat ne correspond.</p>
-              )}
-
-              <ul className="picker-result-list">
-                {filtered.map((recipe) => (
-                  <li key={recipe.id} className="picker-result-row">
-                    <button
-                      type="button"
-                      className={`picker-result ${selectedId === recipe.id ? 'selected' : ''}`}
-                      onClick={() => chooseRecipe(recipe)}
-                    >
-                      <span className="picker-result-name">{recipe.name}</span>
-                      <span className="picker-result-note">
-                        {recipe.kind === 'PREPARED' ? 'tout prêt' : 'maison'}
-                      </span>
-                    </button>
-                    <FavoriteButton
-                      name={recipe.name}
-                      isFavorite={Boolean(recipe.isFavorite)}
-                      onToggle={() => toggleFavorite(recipe)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </>
-        ) : (
-          <label className="picker-quantity">
-            Nom de l'écart
-            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ex : Resto italien" />
-          </label>
-        )}
-
-        <label className="picker-quantity">
-          Calories (kcal)
-          <input
-            type="number"
-            min={1}
-            value={calories}
-            onChange={(e) => setCalories(e.target.value === '' ? '' : Number(e.target.value))}
-          />
-        </label>
-
-        <div className="modal-actions">
-          <button type="button" className="modal-button modal-button--no" onClick={onClose}>
-            Annuler
-          </button>
-          <button
-            type="button"
-            className="modal-button modal-button--yes"
-            disabled={!canConfirm || isSaving}
-            onClick={confirm}
-          >
-            {isEdit ? 'Enregistrer' : 'Ajouter'}
-          </button>
-        </div>
+        {content}
       </div>
     </div>
   );

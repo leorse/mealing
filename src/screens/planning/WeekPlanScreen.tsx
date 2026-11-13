@@ -20,6 +20,7 @@ import {
 import { addDays, weekDates, fromIsoDate } from '../../utils/date';
 import { MEAL_TYPES } from '../../utils/mealTypes';
 import MaskIcon from '../../components/MaskIcon';
+import PlanEntryModal from '../../components/PlanEntryModal';
 import MealPickerModal from '../../components/MealPickerModal';
 import HoldToDeleteButton from '../../components/HoldToDeleteButton';
 import AiReviewModal from '../../components/AiReviewModal';
@@ -208,7 +209,7 @@ export default function WeekPlanScreen() {
                             type="button"
                             className="meal-entry"
                             onClick={() => setEditing(slot)}
-                            aria-label={`Modifier ${slot.freeLabel}`}
+                            aria-label={slot.recipeId ? `Voir ${slot.freeLabel}` : `Modifier ${slot.freeLabel}`}
                           >
                             <span className="meal-entry-name" title={slot.freeLabel}>{slot.freeLabel}</span>
                             <span className="meal-slot-kcal">{slotCalories(slot)} kcal</span>
@@ -246,7 +247,9 @@ export default function WeekPlanScreen() {
         />
       )}
 
-      {editing && (
+      {editing?.recipeId && <PlanEntryModal slot={editing} onClose={() => setEditing(null)} />}
+
+      {editing && !editing.recipeId && (
         <MealPickerModal
           open
           slotDate={editing.slotDate}

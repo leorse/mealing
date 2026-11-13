@@ -1311,3 +1311,17 @@ body {
   user-select: text;
   font-family: monospace;
 }
+
+/* Fiche d'un plat dans la fenêtre d'une entrée du planning : seule la fiche défile. */
+.plan-entry-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.plan-entry-detail h1 {
+  font-size: 1.2rem;
+  overflow-wrap: anywhere;
+}

@@ -22,7 +22,9 @@ Dans [src/components/](../../src/components/), export par défaut.
 | `IngredientPickerModal` | `open`, `existingIngredientIds`, `onConfirm`, `onCancel`, `onIngredientChange?` | Recherche d'un ingrédient + quantité, ou saisie libre (nom, quantité, valeurs pour 100 g) |
 | `IngredientNutritionModal` | `ingredient` (`null` = fermée), `onSaved`, `onCancel` | Correction des valeurs pour 100 g d'un aliment personnel ; écrit l'aliment à la validation |
 | `NutritionFields` | `value`, `onChange` | Les quatre champs calories / protéines / glucides / lipides pour 100 g, dans une fenêtre |
-| `MealPickerModal` | `open`, `slotDate`, `mealType`, `slot?`, `onClose` | Ajout ou modification d'une entrée du planning (recette ou écart) |
+| `MealPickerModal` | `open`, `slotDate`, `mealType`, `slot?`, `embedded?`, `onClose` | Ajout ou modification d'une entrée du planning (recette ou écart) ; `embedded` rend le contenu sans fenêtre |
+| `PlanEntryModal` | `slot`, `onClose` | Entrée de plat du planning : onglet « Plat » (fiche en lecture seule) et « Remplacer » (`MealPickerModal` intégré) ; un écart ouvre `MealPickerModal` directement |
+| `RecipeDetailView` | `recipeId` | Fiche d'un plat (nom, badges, ingrédients, nutrition), partagée par l'écran Plats et `PlanEntryModal` ; `.plan-entry-detail` la fait défiler dans la fenêtre |
 | `FavoriteButton` | `name`, `isFavorite`, `onToggle` | Cœur d'un plat en `.icon-button`, `aria-pressed` ; liste des plats et fenêtre du planning |
 | `WeekAiModal` | `weekStart`, `slots`, `goal`, `canReview`, `onRequestReview`, `onClose` | Fenêtre IA de la semaine : onglets « Bilan » et « Remplir la semaine » (grille, propositions, création) |
 | `AiReviewModal` | `title`, `text`, `score?`, `isOutdated?`, `dayScores?`, `isError?`, `showSettingsLink?`, `onClose` | Lecture d'un avis de l'IA, d'un bilan de semaine ou d'un message d'échec |
